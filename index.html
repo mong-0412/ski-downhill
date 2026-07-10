@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>씽씽 스키</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="game-shell" aria-label="씽씽 스키 게임">
+    <canvas id="game" aria-label="플레이 가능한 다운힐 스키 게임 캔버스"></canvas>
+
+    <section class="hud" aria-label="점수판">
+      <div class="metric">
+        <span>점수</span>
+        <strong><span id="score">0</span>점</strong>
+      </div>
+      <div class="metric">
+        <span>최고</span>
+        <strong><span id="best">0</span>점</strong>
+      </div>
+      <div class="metric compact">
+        <span>속도</span>
+        <strong><span id="speed">0</span></strong>
+      </div>
+    </section>
+
+    <section class="itembar" aria-label="아이템 상태">
+      <div class="item-pill">
+        <span>보너스</span>
+        <strong><span id="bonus">0</span></strong>
+      </div>
+      <div class="item-pill" id="shieldPill">
+        <span>방패</span>
+        <strong><span id="shield">0</span></strong>
+      </div>
+    </section>
+
+    <section class="overlay is-splash" id="overlay" aria-live="polite">
+      <div class="overlay-panel">
+        <p class="eyebrow" id="overlayKicker">모바일 스키런</p>
+        <h1 id="overlayTitle">씽씽 스키</h1>
+        <p id="overlayText">왼쪽을 누르면 오른쪽으로, 오른쪽을 누르면 왼쪽으로 이동합니다. 눈결정은 보너스 점수, 방패는 충돌을 한 번 막아줍니다.</p>
+        <form class="player-form" id="playerForm">
+          <label for="nickname">닉네임</label>
+          <div class="name-row">
+            <input id="nickname" name="nickname" type="text" maxlength="12" autocomplete="nickname" inputmode="text" placeholder="닉네임 입력">
+            <button id="startButton" type="submit">시작하기</button>
+          </div>
+        </form>
+        <div class="leaderboard-panel" aria-label="리더보드">
+          <div class="leaderboard-head">
+            <strong>리더보드</strong>
+            <button id="refreshLeaderboard" type="button">새로고침</button>
+          </div>
+          <ol class="leaderboard-list" id="leaderboardList">
+            <li class="is-empty">기록을 불러오는 중입니다.</li>
+          </ol>
+          <p class="leaderboard-status" id="leaderboardStatus"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="rotate-warning" aria-label="세로 화면 안내">
+      <div>
+        <h2>세로로 돌려주세요</h2>
+        <p>이 게임은 휴대폰 세로 화면에 맞춰져 있습니다.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="./config.js" defer></script>
+  <script src="./game.js" defer></script>
+</body>
+</html>

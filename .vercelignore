@@ -1,0 +1,7 @@
+.env
+.env.*
+.data/
+config.js
+dist/
+phone-qr.png
+phone-qr.svg

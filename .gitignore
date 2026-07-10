@@ -1,0 +1,8 @@
+.env.local
+.data/
+config.js
+dist/
+phone-qr.png
+phone-qr.svg
+assets/source-*.png
+assets/skier-right.png

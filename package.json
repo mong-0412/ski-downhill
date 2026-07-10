@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node server.mjs"
+  }
+}
