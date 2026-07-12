@@ -22,9 +22,18 @@
   const nicknameInput = document.getElementById("nickname");
   const startButton = document.getElementById("startButton");
   const startButtonLabel = startButton.querySelector("span");
+  const leaderboardPanel = document.getElementById("leaderboardPanel");
   const refreshLeaderboardButton = document.getElementById("refreshLeaderboard");
   const leaderboardList = document.getElementById("leaderboardList");
   const leaderboardStatus = document.getElementById("leaderboardStatus");
+  const leaderboardModal = document.getElementById("leaderboardModal");
+  const leaderboardDialog = leaderboardModal.querySelector(".leaderboard-dialog");
+  const closeLeaderboardButton = document.getElementById("closeLeaderboard");
+  const fullLeaderboardList = document.getElementById("fullLeaderboardList");
+  const fullLeaderboardStatus = document.getElementById("fullLeaderboardStatus");
+  const myLeaderboardRank = document.getElementById("myLeaderboardRank");
+  const myLeaderboardDetail = document.getElementById("myLeaderboardDetail");
+  const jumpToMyRankButton = document.getElementById("jumpToMyRank");
 
   const STORAGE_KEY = "ski-downhill-best-v1";
   const PLAYER_NAME_KEY = "ski-downhill-player-name-v1";
@@ -33,6 +42,7 @@
   const SKI_LOOP_SRC = "./assets/ski-loop.wav";
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
+  const LEADERBOARD_FULL_LIMIT = 1000;
   const SCORE_SUBMIT_TIMEOUT_MS = 8000;
   const LEADERBOARD_NO_CACHE_HEADERS = {
     "Cache-Control": "no-cache, no-store, max-age=0",
@@ -91,12 +101,16 @@
     playerName: readPlayerName(),
     leaderboardOnline: true,
     leaderboardRequestId: 0,
+    fullLeaderboardRequestId: 0,
     idleTime: 0,
     deathDistance: 0,
     newBest: false,
     scoreSubmitted: false,
     scoreSubmissionPending: false,
   };
+
+  let leaderboardModalReturnFocus = null;
+  let leaderboardModalHistoryActive = false;
 
   const sound = createSoundController();
 
@@ -801,7 +815,8 @@
     };
   }
 
-  function sortLeaderboard(entries) {
+  function sortLeaderboard(entries, limit = LEADERBOARD_LIMIT) {
+    const normalizedLimit = Math.max(1, Number.parseInt(limit, 10) || LEADERBOARD_LIMIT);
     const seen = new Set();
     const sorted = entries
       .map(normalizeLeaderboardEntry)
@@ -816,17 +831,17 @@
       if (seen.has(entry.nickname)) continue;
       seen.add(entry.nickname);
       deduped.push(entry);
-      if (deduped.length >= LEADERBOARD_LIMIT) break;
+      if (deduped.length >= normalizedLimit) break;
     }
 
     return deduped;
   }
 
-  function readLocalLeaderboard() {
+  function readLocalLeaderboard(limit = LEADERBOARD_LIMIT) {
     try {
       const raw = window.localStorage.getItem(LOCAL_LEADERBOARD_KEY);
       const parsed = JSON.parse(raw || "[]");
-      return sortLeaderboard(Array.isArray(parsed) ? parsed : []);
+      return sortLeaderboard(Array.isArray(parsed) ? parsed : [], limit);
     } catch {
       return [];
     }
@@ -834,7 +849,7 @@
 
   function saveLocalLeaderboardEntry(entry) {
     try {
-      const entries = readLocalLeaderboard();
+      const entries = readLocalLeaderboard(LEADERBOARD_FULL_LIMIT);
       const nextEntry = normalizeLeaderboardEntry(entry);
       const previous = entries.find((item) => item.nickname === nextEntry.nickname);
       const nextEntries = previous && previous.score >= nextEntry.score
@@ -842,7 +857,7 @@
         : sortLeaderboard([
           ...entries.filter((item) => item.nickname !== nextEntry.nickname),
           nextEntry,
-        ]);
+        ], LEADERBOARD_FULL_LIMIT);
 
       window.localStorage.setItem(LOCAL_LEADERBOARD_KEY, JSON.stringify(nextEntries));
       return nextEntries;
@@ -884,6 +899,35 @@
     firstPlacePrize.hidden = false;
   }
 
+  function createLeaderboardItem(entry, index) {
+    const item = document.createElement("li");
+    if (entry.nickname === state.playerName) {
+      item.classList.add("is-me");
+      item.dataset.ownRank = String(index + 1);
+    }
+
+    const rank = document.createElement("span");
+    rank.className = "leaderboard-rank";
+    rank.textContent = `${index + 1}`;
+
+    const name = document.createElement("span");
+    name.className = "leaderboard-name";
+    name.textContent = entry.nickname;
+    if (entry.nickname === state.playerName) {
+      const me = document.createElement("span");
+      me.className = "leaderboard-me";
+      me.textContent = "ME";
+      name.append(me);
+    }
+
+    const score = document.createElement("span");
+    score.className = "leaderboard-score";
+    score.textContent = entry.score.toLocaleString("ko-KR");
+
+    item.append(rank, name, score);
+    return item;
+  }
+
   function renderLeaderboard(entries) {
     const normalized = sortLeaderboard(entries);
     leaderboardList.replaceChildren();
@@ -897,32 +941,150 @@
     }
 
     normalized.forEach((entry, index) => {
-      const item = document.createElement("li");
-      if (entry.nickname === state.playerName) {
-        item.classList.add("is-me");
-      }
-
-      const rank = document.createElement("span");
-      rank.className = "leaderboard-rank";
-      rank.textContent = `${index + 1}`;
-
-      const name = document.createElement("span");
-      name.className = "leaderboard-name";
-      name.textContent = entry.nickname;
-      if (entry.nickname === state.playerName) {
-        const me = document.createElement("span");
-        me.className = "leaderboard-me";
-        me.textContent = "ME";
-        name.append(me);
-      }
-
-      const score = document.createElement("span");
-      score.className = "leaderboard-score";
-      score.textContent = entry.score.toLocaleString("ko-KR");
-
-      item.append(rank, name, score);
-      leaderboardList.append(item);
+      leaderboardList.append(createLeaderboardItem(entry, index));
     });
+  }
+
+  function renderFullLeaderboard(entries, statusMessage = "") {
+    const normalized = sortLeaderboard(entries, LEADERBOARD_FULL_LIMIT);
+    const ownIndex = normalized.findIndex((entry) => entry.nickname === state.playerName);
+    fullLeaderboardList.replaceChildren();
+
+    if (!normalized.length) {
+      const item = document.createElement("li");
+      item.className = "is-empty";
+      item.textContent = "아직 등록된 기록이 없습니다.";
+      fullLeaderboardList.append(item);
+    } else {
+      normalized.forEach((entry, index) => {
+        fullLeaderboardList.append(createLeaderboardItem(entry, index));
+      });
+    }
+
+    fullLeaderboardStatus.textContent = statusMessage || `전체 ${normalized.length.toLocaleString("ko-KR")}명`;
+
+    if (ownIndex >= 0) {
+      const ownEntry = normalized[ownIndex];
+      myLeaderboardRank.textContent = `${(ownIndex + 1).toLocaleString("ko-KR")}위`;
+      myLeaderboardDetail.textContent = `${ownEntry.nickname} · ${ownEntry.score.toLocaleString("ko-KR")}점`;
+      jumpToMyRankButton.disabled = false;
+      jumpToMyRankButton.textContent = "내 위치 보기";
+      return;
+    }
+
+    myLeaderboardRank.textContent = "미등록";
+    myLeaderboardDetail.textContent = `${state.playerName} 님의 완주 기록이 아직 없어요.`;
+    jumpToMyRankButton.disabled = true;
+    jumpToMyRankButton.textContent = "기록 없음";
+  }
+
+  function setFullLeaderboardLoading() {
+    fullLeaderboardList.replaceChildren();
+    const item = document.createElement("li");
+    item.className = "is-empty";
+    item.textContent = "전체 순위를 불러오는 중...";
+    fullLeaderboardList.append(item);
+    fullLeaderboardStatus.textContent = "전체 순위를 불러오는 중...";
+    myLeaderboardRank.textContent = "—";
+    myLeaderboardDetail.textContent = "내 기록을 확인하고 있어요.";
+    jumpToMyRankButton.disabled = true;
+    jumpToMyRankButton.textContent = "내 위치 보기";
+  }
+
+  async function loadFullLeaderboard() {
+    state.fullLeaderboardRequestId += 1;
+    const requestId = state.fullLeaderboardRequestId;
+    setFullLeaderboardLoading();
+
+    try {
+      let entries;
+      if (supabaseClient) {
+        entries = await supabaseClient.list(LEADERBOARD_FULL_LIMIT);
+      } else {
+        const response = await fetch(`./api/leaderboard?limit=${LEADERBOARD_FULL_LIMIT}`, {
+          headers: LEADERBOARD_NO_CACHE_HEADERS,
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Leaderboard API unavailable");
+        const data = await response.json();
+        entries = data.entries;
+      }
+
+      if (requestId !== state.fullLeaderboardRequestId || leaderboardModal.hidden) return;
+      renderFullLeaderboard(Array.isArray(entries) ? entries : []);
+    } catch {
+      if (requestId !== state.fullLeaderboardRequestId || leaderboardModal.hidden) return;
+      renderFullLeaderboard(
+        readLocalLeaderboard(LEADERBOARD_FULL_LIMIT),
+        "오프라인에 저장된 순위입니다.",
+      );
+    }
+  }
+
+  function openLeaderboardModal() {
+    if (!leaderboardModal.hidden) return;
+    savePlayerName(nicknameInput.value);
+    leaderboardModalReturnFocus = document.activeElement;
+    leaderboardModal.hidden = false;
+    document.body.classList.add("has-leaderboard-modal");
+
+    try {
+      window.history.pushState({ ...window.history.state, ssingLeaderboard: true }, "");
+      leaderboardModalHistoryActive = true;
+    } catch {
+      leaderboardModalHistoryActive = false;
+    }
+
+    leaderboardDialog.focus({ preventScroll: true });
+    void loadFullLeaderboard();
+  }
+
+  function closeLeaderboardModal(fromHistory = false) {
+    if (leaderboardModal.hidden) return;
+    leaderboardModal.hidden = true;
+    document.body.classList.remove("has-leaderboard-modal");
+    state.fullLeaderboardRequestId += 1;
+
+    if (leaderboardModalHistoryActive && !fromHistory) {
+      leaderboardModalHistoryActive = false;
+      window.history.back();
+    } else if (fromHistory) {
+      leaderboardModalHistoryActive = false;
+    }
+
+    if (leaderboardModalReturnFocus instanceof HTMLElement && document.contains(leaderboardModalReturnFocus)) {
+      leaderboardModalReturnFocus.focus({ preventScroll: true });
+    }
+    leaderboardModalReturnFocus = null;
+  }
+
+  function handleLeaderboardModalKeyDown(event) {
+    if (leaderboardModal.hidden) return;
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeLeaderboardModal();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(
+      leaderboardModal.querySelectorAll("button:not([disabled])"),
+    );
+    if (!focusable.length) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (document.activeElement === leaderboardDialog) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    } else if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   async function loadLeaderboard(message = "") {
@@ -985,6 +1147,7 @@
         state.leaderboardOnline = true;
         renderLeaderboard(normalizedEntries);
         setLeaderboardStatus("");
+        if (!leaderboardModal.hidden) void loadFullLeaderboard();
         return;
       }
 
@@ -1006,12 +1169,19 @@
       state.leaderboardOnline = true;
       renderLeaderboard(normalizedEntries);
       setLeaderboardStatus("");
+      if (!leaderboardModal.hidden) void loadFullLeaderboard();
     } catch {
       const localEntries = saveLocalLeaderboardEntry(entry);
       if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = false;
       renderLeaderboard(localEntries);
       setLeaderboardStatus("오프라인 기록으로 저장했어요.");
+      if (!leaderboardModal.hidden) {
+        renderFullLeaderboard(
+          readLocalLeaderboard(LEADERBOARD_FULL_LIMIT),
+          "오프라인에 저장된 순위입니다.",
+        );
+      }
     } finally {
       state.scoreSubmissionPending = false;
       startButton.disabled = false;
@@ -2032,7 +2202,7 @@
 
   function isOverlayInteraction(event) {
     return event.target instanceof Element
-      && Boolean(event.target.closest(".overlay, .rotate-warning"));
+      && Boolean(event.target.closest(".overlay, .rotate-warning, .leaderboard-modal"));
   }
 
   function isControlInteraction(event) {
@@ -2066,6 +2236,7 @@
   }
 
   function handleKeyDown(event) {
+    if (!leaderboardModal.hidden) return;
     if (event.repeat) return;
     void sound.unlock();
 
@@ -2128,6 +2299,11 @@
   window.addEventListener("pointercancel", stopPointerSteer);
   window.addEventListener("keydown", handleKeyDown);
   window.addEventListener("keyup", handleKeyUp);
+  window.addEventListener("popstate", () => {
+    if (leaderboardModal.hidden) return;
+    closeLeaderboardModal(true);
+  });
+  document.addEventListener("keydown", handleLeaderboardModalKeyDown);
   document.addEventListener("visibilitychange", () => {
     state.lastTime = 0;
     if (document.hidden) {
@@ -2160,6 +2336,29 @@
   refreshLeaderboardButton.addEventListener("click", () => {
     savePlayerName(nicknameInput.value);
     void loadLeaderboard("기록 새로고침 중...");
+  });
+
+  leaderboardPanel.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest("#refreshLeaderboard")) return;
+    openLeaderboardModal();
+  });
+
+  closeLeaderboardButton.addEventListener("click", () => {
+    closeLeaderboardModal();
+  });
+
+  leaderboardModal.addEventListener("click", (event) => {
+    if (event.target === leaderboardModal) closeLeaderboardModal();
+  });
+
+  jumpToMyRankButton.addEventListener("click", () => {
+    const ownItem = fullLeaderboardList.querySelector(".is-me");
+    if (!ownItem) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ownItem.scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "center",
+    });
   });
 
   resizeCanvas();

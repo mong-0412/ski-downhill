@@ -170,7 +170,10 @@ async function readRequestJson(request) {
 
 async function handleLeaderboard(request, response, parsedUrl) {
   if (request.method === "GET") {
-    const limit = Math.max(1, Math.min(50, Number.parseInt(parsedUrl.searchParams.get("limit") || "10", 10)));
+    const limit = Math.max(
+      1,
+      Math.min(leaderboardLimit, Number.parseInt(parsedUrl.searchParams.get("limit") || "10", 10)),
+    );
     const entries = sortLeaderboard(await readLeaderboard()).slice(0, limit);
     sendJson(response, 200, { entries });
     return true;

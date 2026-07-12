@@ -114,15 +114,21 @@
           <p><strong>축하드립니다!!</strong> SSING 부스로 오셔서 키캡 키링을 받아가세요!!</p>
         </div>
 
-        <div class="leaderboard-panel" aria-label="리더보드">
+        <div class="leaderboard-panel" id="leaderboardPanel" aria-label="리더보드 · 누르면 전체 순위 열기">
           <div class="leaderboard-head">
-            <span class="ranking-mark" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M7 4h10v4c0 3.2-2 5.8-5 6.8C9 13.8 7 11.2 7 8V4Z"/>
-                <path d="M7 6H4v1c0 2.2 1.3 3.8 3.4 4.2M17 6h3v1c0 2.2-1.3 3.8-3.4 4.2M12 15v3M8.5 21h7"/>
+            <button class="leaderboard-open" id="openLeaderboard" type="button" aria-haspopup="dialog" aria-controls="leaderboardModal">
+              <span class="ranking-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M7 4h10v4c0 3.2-2 5.8-5 6.8C9 13.8 7 11.2 7 8V4Z"/>
+                  <path d="M7 6H4v1c0 2.2 1.3 3.8 3.4 4.2M17 6h3v1c0 2.2-1.3 3.8-3.4 4.2M12 15v3M8.5 21h7"/>
+                </svg>
+              </span>
+              <strong>SSING RANKING</strong>
+              <span class="leaderboard-open-label">전체보기</span>
+              <svg class="leaderboard-open-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 5 7 7-7 7"/>
               </svg>
-            </span>
-            <strong>SSING RANKING</strong>
+            </button>
             <button id="refreshLeaderboard" type="button" aria-label="랭킹 새로고침" title="랭킹 새로고침">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M19.2 8A8 8 0 1 0 20 14M19.2 8V3.8M19.2 8H15"/>
@@ -147,6 +153,40 @@
             </svg>
           </button>
         </form>
+      </div>
+    </section>
+
+    <section class="leaderboard-modal" id="leaderboardModal" hidden>
+      <div class="leaderboard-dialog" role="dialog" aria-modal="true" aria-labelledby="leaderboardModalTitle" tabindex="-1">
+        <header class="leaderboard-dialog-head">
+          <div>
+            <p>SSING DOWNHILL</p>
+            <h2 id="leaderboardModalTitle">전체 리더보드</h2>
+          </div>
+          <button class="leaderboard-close" id="closeLeaderboard" type="button" aria-label="전체 리더보드 닫기">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18"/>
+            </svg>
+          </button>
+        </header>
+
+        <div class="my-rank-card" aria-live="polite" aria-atomic="true">
+          <div>
+            <span>MY RANK</span>
+            <strong id="myLeaderboardRank">—</strong>
+          </div>
+          <p id="myLeaderboardDetail">내 기록을 확인하고 있어요.</p>
+          <button id="jumpToMyRank" type="button" disabled>내 위치 보기</button>
+        </div>
+
+        <div class="full-leaderboard-meta">
+          <p id="fullLeaderboardStatus" role="status">전체 순위를 불러오는 중...</p>
+          <span>BEST SCORE</span>
+        </div>
+
+        <ol class="leaderboard-list full-leaderboard-list" id="fullLeaderboardList">
+          <li class="is-empty">전체 순위를 불러오는 중...</li>
+        </ol>
       </div>
     </section>
 
