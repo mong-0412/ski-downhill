@@ -182,7 +182,6 @@
     let skiGain = null;
     let skiHighpass = null;
     let skiLowpass = null;
-    let skiCompressor = null;
     let skiPlaying = false;
     let skiSource = null;
 
@@ -211,7 +210,6 @@
       skiGain = audio.createGain();
       skiHighpass = audio.createBiquadFilter();
       skiLowpass = audio.createBiquadFilter();
-      skiCompressor = audio.createDynamicsCompressor();
 
       skiGain.gain.value = 0;
       skiHighpass.type = "highpass";
@@ -220,16 +218,10 @@
       skiLowpass.type = "lowpass";
       skiLowpass.frequency.value = 5600;
       skiLowpass.Q.value = 0.25;
-      skiCompressor.threshold.value = -34;
-      skiCompressor.knee.value = 18;
-      skiCompressor.ratio.value = 8;
-      skiCompressor.attack.value = 0.004;
-      skiCompressor.release.value = 0.16;
 
       skiGain.connect(skiHighpass);
       skiHighpass.connect(skiLowpass);
-      skiLowpass.connect(skiCompressor);
-      skiCompressor.connect(master);
+      skiLowpass.connect(master);
       return skiGain;
     }
 
