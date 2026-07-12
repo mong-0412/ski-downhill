@@ -180,10 +180,11 @@
     let skiBuffer = null;
     let skiBufferPromise = null;
     let skiGain = null;
+    let skiHighpass = null;
+    let skiLowpass = null;
+    let skiCompressor = null;
     let skiPlaying = false;
-    let skiNextStartTime = 0;
-    let skiTimer = 0;
-    let skiSources = [];
+    let skiSource = null;
 
     function ensureAudio() {
       if (!AudioContextClass) return null;
@@ -208,16 +209,35 @@
       if (skiGain) return skiGain;
 
       skiGain = audio.createGain();
+      skiHighpass = audio.createBiquadFilter();
+      skiLowpass = audio.createBiquadFilter();
+      skiCompressor = audio.createDynamicsCompressor();
+
       skiGain.gain.value = 0;
-      skiGain.connect(master);
+      skiHighpass.type = "highpass";
+      skiHighpass.frequency.value = 160;
+      skiHighpass.Q.value = 0.45;
+      skiLowpass.type = "lowpass";
+      skiLowpass.frequency.value = 5600;
+      skiLowpass.Q.value = 0.25;
+      skiCompressor.threshold.value = -34;
+      skiCompressor.knee.value = 18;
+      skiCompressor.ratio.value = 8;
+      skiCompressor.attack.value = 0.004;
+      skiCompressor.release.value = 0.16;
+
+      skiGain.connect(skiHighpass);
+      skiHighpass.connect(skiLowpass);
+      skiLowpass.connect(skiCompressor);
+      skiCompressor.connect(master);
       return skiGain;
     }
 
     function trimLoopBuffer(buffer) {
       if (!audio || buffer.length < 2) return buffer;
 
-      const threshold = 0.004;
-      const padding = Math.floor(buffer.sampleRate * 0.025);
+      const threshold = 0.003;
+      const padding = 0;
       let start = 0;
       let end = buffer.length;
 
@@ -276,53 +296,6 @@
       return skiBufferPromise;
     }
 
-    function scheduleSkiSource(startTime) {
-      if (!audio || !skiGain || !skiBuffer) return;
-
-      const duration = skiBuffer.duration;
-      const fade = Math.min(0.09, Math.max(0.025, duration * 0.16));
-      const source = audio.createBufferSource();
-      const gain = audio.createGain();
-
-      source.buffer = skiBuffer;
-      source.connect(gain);
-      gain.connect(skiGain);
-
-      gain.gain.setValueAtTime(0.0001, startTime);
-      gain.gain.linearRampToValueAtTime(1, startTime + fade);
-      gain.gain.setValueAtTime(1, Math.max(startTime + fade, startTime + duration - fade));
-      gain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
-
-      source.onended = () => {
-        skiSources = skiSources.filter((item) => item !== source);
-      };
-
-      source.start(startTime);
-      source.stop(startTime + duration + 0.04);
-      skiSources.push(source);
-    }
-
-    function scheduleSkiLoop() {
-      if (!skiPlaying || muted || !audio || !skiBuffer || !ensureSkiGain()) return;
-
-      const now = audio.currentTime;
-      const duration = skiBuffer.duration;
-      const crossfade = Math.min(0.09, Math.max(0.025, duration * 0.16));
-      const step = Math.max(0.05, duration - crossfade);
-
-      if (skiNextStartTime < now + 0.02) {
-        skiNextStartTime = now + 0.02;
-      }
-
-      while (skiNextStartTime < now + 1.35) {
-        scheduleSkiSource(skiNextStartTime);
-        skiNextStartTime += step;
-      }
-
-      window.clearTimeout(skiTimer);
-      skiTimer = window.setTimeout(scheduleSkiLoop, 320);
-    }
-
     function startSkiLoop() {
       if (muted) return;
 
@@ -338,24 +311,33 @@
       }
 
       gain.gain.cancelScheduledValues(instance.currentTime);
-      gain.gain.setTargetAtTime(0.48, instance.currentTime, 0.06);
+      gain.gain.setTargetAtTime(0.16, instance.currentTime, 0.08);
 
       if (skiPlaying) return;
       skiPlaying = true;
 
       loadSkiBuffer()
-        .then(() => {
+        .then((buffer) => {
           if (!skiPlaying || muted || !audio) return;
-          skiNextStartTime = audio.currentTime + 0.03;
-          scheduleSkiLoop();
+          const source = audio.createBufferSource();
+          source.buffer = buffer;
+          source.loop = true;
+          source.loopStart = 0;
+          source.loopEnd = Math.max(0.05, buffer.duration - 0.002);
+          source.connect(gain);
+          source.onended = () => {
+            if (skiSource === source) skiSource = null;
+          };
+          skiSource = source;
+          source.start(audio.currentTime + 0.03);
         })
-        .catch(() => {});
+        .catch(() => {
+          skiPlaying = false;
+        });
     }
 
     function stopSkiLoop() {
       skiPlaying = false;
-      window.clearTimeout(skiTimer);
-      skiTimer = 0;
 
       if (!audio) return;
       if (skiGain) {
@@ -363,15 +345,15 @@
         skiGain.gain.setTargetAtTime(0, audio.currentTime, 0.045);
       }
 
-      const stopAt = audio.currentTime + 0.18;
-      for (const source of skiSources) {
+      if (skiSource) {
+        const source = skiSource;
+        skiSource = null;
         try {
-          source.stop(stopAt);
+          source.stop(audio.currentTime + 0.18);
         } catch {
           // The source may already have ended.
         }
       }
-      skiSources = [];
     }
 
     function tone(frequency, duration, options = {}) {
