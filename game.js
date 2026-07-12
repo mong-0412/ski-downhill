@@ -26,6 +26,7 @@
   const PLAYER_NAME_KEY = "ski-downhill-player-name-v1";
   const LOCAL_LEADERBOARD_KEY = "ski-downhill-local-leaderboard-v1";
   const SOUND_MUTED_KEY = "ski-downhill-sound-muted-v1";
+  const SKI_LOOP_SRC = "./assets/ski-loop.mp3";
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
   const LEADERBOARD_NO_CACHE_HEADERS = {
@@ -176,6 +177,13 @@
     let audio = null;
     let master = null;
     let muted = readSoundMuted();
+    let skiBuffer = null;
+    let skiBufferPromise = null;
+    let skiGain = null;
+    let skiPlaying = false;
+    let skiNextStartTime = 0;
+    let skiTimer = 0;
+    let skiSources = [];
 
     function ensureAudio() {
       if (!AudioContextClass) return null;
@@ -193,6 +201,177 @@
       const now = audio.currentTime + at;
       master.gain.cancelScheduledValues(now);
       master.gain.setTargetAtTime(value, now, 0.025);
+    }
+
+    function ensureSkiGain() {
+      if (!audio || !master) return null;
+      if (skiGain) return skiGain;
+
+      skiGain = audio.createGain();
+      skiGain.gain.value = 0;
+      skiGain.connect(master);
+      return skiGain;
+    }
+
+    function trimLoopBuffer(buffer) {
+      if (!audio || buffer.length < 2) return buffer;
+
+      const threshold = 0.004;
+      const padding = Math.floor(buffer.sampleRate * 0.025);
+      let start = 0;
+      let end = buffer.length;
+
+      for (let i = 0; i < buffer.length; i += 1) {
+        let level = 0;
+        for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+          level = Math.max(level, Math.abs(buffer.getChannelData(channel)[i]));
+        }
+        if (level > threshold) {
+          start = Math.max(0, i - padding);
+          break;
+        }
+      }
+
+      for (let i = buffer.length - 1; i >= start; i -= 1) {
+        let level = 0;
+        for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+          level = Math.max(level, Math.abs(buffer.getChannelData(channel)[i]));
+        }
+        if (level > threshold) {
+          end = Math.min(buffer.length, i + padding);
+          break;
+        }
+      }
+
+      const length = Math.max(1, end - start);
+      if (length >= buffer.length - 2) return buffer;
+
+      const trimmed = audio.createBuffer(buffer.numberOfChannels, length, buffer.sampleRate);
+      for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+        trimmed.copyToChannel(buffer.getChannelData(channel).subarray(start, end), channel);
+      }
+      return trimmed;
+    }
+
+    function loadSkiBuffer() {
+      const instance = ensureAudio();
+      if (!instance) return Promise.reject(new Error("Audio unavailable"));
+      if (skiBuffer) return Promise.resolve(skiBuffer);
+      if (skiBufferPromise) return skiBufferPromise;
+
+      skiBufferPromise = fetch(SKI_LOOP_SRC)
+        .then((response) => {
+          if (!response.ok) throw new Error("Ski loop unavailable");
+          return response.arrayBuffer();
+        })
+        .then((arrayBuffer) => instance.decodeAudioData(arrayBuffer))
+        .then((buffer) => {
+          skiBuffer = trimLoopBuffer(buffer);
+          return skiBuffer;
+        })
+        .finally(() => {
+          skiBufferPromise = null;
+        });
+
+      return skiBufferPromise;
+    }
+
+    function scheduleSkiSource(startTime) {
+      if (!audio || !skiGain || !skiBuffer) return;
+
+      const duration = skiBuffer.duration;
+      const fade = Math.min(0.09, Math.max(0.025, duration * 0.16));
+      const source = audio.createBufferSource();
+      const gain = audio.createGain();
+
+      source.buffer = skiBuffer;
+      source.connect(gain);
+      gain.connect(skiGain);
+
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.linearRampToValueAtTime(1, startTime + fade);
+      gain.gain.setValueAtTime(1, Math.max(startTime + fade, startTime + duration - fade));
+      gain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
+
+      source.onended = () => {
+        skiSources = skiSources.filter((item) => item !== source);
+      };
+
+      source.start(startTime);
+      source.stop(startTime + duration + 0.04);
+      skiSources.push(source);
+    }
+
+    function scheduleSkiLoop() {
+      if (!skiPlaying || muted || !audio || !skiBuffer || !ensureSkiGain()) return;
+
+      const now = audio.currentTime;
+      const duration = skiBuffer.duration;
+      const crossfade = Math.min(0.09, Math.max(0.025, duration * 0.16));
+      const step = Math.max(0.05, duration - crossfade);
+
+      if (skiNextStartTime < now + 0.02) {
+        skiNextStartTime = now + 0.02;
+      }
+
+      while (skiNextStartTime < now + 1.35) {
+        scheduleSkiSource(skiNextStartTime);
+        skiNextStartTime += step;
+      }
+
+      window.clearTimeout(skiTimer);
+      skiTimer = window.setTimeout(scheduleSkiLoop, 320);
+    }
+
+    function startSkiLoop() {
+      if (muted) return;
+
+      const instance = ensureAudio();
+      const gain = ensureSkiGain();
+      if (!instance || !gain) return;
+
+      if (instance.state === "suspended") {
+        instance.resume()
+          .then(startSkiLoop)
+          .catch(() => {});
+        return;
+      }
+
+      gain.gain.cancelScheduledValues(instance.currentTime);
+      gain.gain.setTargetAtTime(0.48, instance.currentTime, 0.06);
+
+      if (skiPlaying) return;
+      skiPlaying = true;
+
+      loadSkiBuffer()
+        .then(() => {
+          if (!skiPlaying || muted || !audio) return;
+          skiNextStartTime = audio.currentTime + 0.03;
+          scheduleSkiLoop();
+        })
+        .catch(() => {});
+    }
+
+    function stopSkiLoop() {
+      skiPlaying = false;
+      window.clearTimeout(skiTimer);
+      skiTimer = 0;
+
+      if (!audio) return;
+      if (skiGain) {
+        skiGain.gain.cancelScheduledValues(audio.currentTime);
+        skiGain.gain.setTargetAtTime(0, audio.currentTime, 0.045);
+      }
+
+      const stopAt = audio.currentTime + 0.18;
+      for (const source of skiSources) {
+        try {
+          source.stop(stopAt);
+        } catch {
+          // The source may already have ended.
+        }
+      }
+      skiSources = [];
     }
 
     function tone(frequency, duration, options = {}) {
@@ -248,12 +427,6 @@
     function schedule(name) {
       if (muted) return;
 
-      if (name === "start") {
-        tone(330, 0.08, { type: "triangle", volume: 0.11 });
-        tone(520, 0.12, { type: "triangle", volume: 0.14, delay: 0.07 });
-        return;
-      }
-
       if (name === "pickup") {
         tone(760, 0.07, { type: "sine", volume: 0.12 });
         tone(1160, 0.1, { type: "sine", volume: 0.1, delay: 0.045 });
@@ -269,12 +442,6 @@
       if (name === "block") {
         tone(210, 0.12, { type: "sawtooth", volume: 0.11, to: 310 });
         tone(620, 0.16, { type: "triangle", volume: 0.12, delay: 0.05 });
-        return;
-      }
-
-      if (name === "boost") {
-        noise(0.16, { frequency: 1200, volume: 0.08 });
-        tone(180, 0.18, { type: "triangle", volume: 0.08, to: 260 });
         return;
       }
 
@@ -320,12 +487,15 @@
         muted = Boolean(value);
         saveSoundMuted(muted);
         setMasterGain(muted ? 0 : 0.23);
+        if (muted) stopSkiLoop();
         updateSoundToggle();
       },
       toggle() {
         this.setMuted(!muted);
         if (!muted) this.play("toggle");
       },
+      startSkiLoop,
+      stopSkiLoop,
     };
   }
 
@@ -738,7 +908,7 @@
 
   function resetRun() {
     void sound.unlock();
-    sound.play("start");
+    sound.startSkiLoop();
     savePlayerName(nicknameInput.value);
     state.mode = "running";
     state.distance = 0;
@@ -766,6 +936,7 @@
   function gameOver() {
     state.mode = "gameover";
     state.deathDistance = currentScore();
+    sound.stopSkiLoop();
     sound.play("crash");
     saveBest(state.deathDistance);
     setOverlay("gameover");
@@ -1582,7 +1753,6 @@
   function updateInputState() {
     let leftPressed = state.keyLeft;
     let rightPressed = state.keyRight;
-    const wasFastDrop = state.fastDrop;
 
     for (const side of state.pointerSides.values()) {
       if (side === "left") leftPressed = true;
@@ -1590,10 +1760,6 @@
     }
 
     state.fastDrop = leftPressed && rightPressed;
-
-    if (state.mode === "running" && state.fastDrop && !wasFastDrop) {
-      sound.play("boost");
-    }
 
     if (state.fastDrop) {
       state.steer = 0;
@@ -1725,6 +1891,14 @@
   window.addEventListener("keyup", handleKeyUp);
   document.addEventListener("visibilitychange", () => {
     state.lastTime = 0;
+    if (document.hidden) {
+      sound.stopSkiLoop();
+      return;
+    }
+
+    if (state.mode === "running") {
+      sound.startSkiLoop();
+    }
   });
 
   playerForm.addEventListener("submit", (event) => {
@@ -1738,6 +1912,9 @@
     event.stopPropagation();
     void sound.unlock();
     sound.toggle();
+    if (state.mode === "running" && !sound.isMuted()) {
+      sound.startSkiLoop();
+    }
   });
 
   refreshLeaderboardButton.addEventListener("click", () => {

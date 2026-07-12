@@ -1,4 +1,4 @@
-const CACHE_NAME = "ski-downhill-v20";
+const CACHE_NAME = "ski-downhill-v21";
 const ASSETS = [
   "./",
   "./index.html",
@@ -10,6 +10,7 @@ const ASSETS = [
   "./assets/skier-straight.png",
   "./assets/skier-left.png",
   "./assets/skier-boost.png",
+  "./assets/ski-loop.mp3",
   "./assets/snowflake-pickup.png",
 ];
 
