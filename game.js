@@ -48,6 +48,7 @@
     right: { image: loadSprite("./assets/skier-left.png"), mirror: true },
     boost: { image: loadSprite("./assets/skier-boost.png"), mirror: false },
   };
+  const snowflakeSprite = loadSprite("./assets/snowflake-pickup.png");
 
   const obstacleSpecs = {
     tree: { radius: 19, hit: 12 },
@@ -1156,45 +1157,75 @@
   }
 
   function drawFlakePickup(x, y, radius, seed) {
-    const pulse = 1 + Math.sin(state.idleTime * 5 + seed) * 0.07;
+    const pulse = 1 + Math.sin(state.idleTime * 5 + seed) * 0.065;
+    const size = radius * 2.35;
+    const rotation = Math.sin(state.idleTime * 1.8 + seed) * 0.08;
 
     ctx.save();
     ctx.translate(x, y);
+    ctx.rotate(rotation);
     ctx.scale(pulse, pulse);
 
-    const glow = ctx.createRadialGradient(0, 0, radius * 0.2, 0, 0, radius * 1.4);
-    glow.addColorStop(0, "rgba(255, 255, 255, 0.95)");
-    glow.addColorStop(0.5, "rgba(125, 211, 252, 0.48)");
+    const glow = ctx.createRadialGradient(0, 0, radius * 0.18, 0, 0, radius * 1.65);
+    glow.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+    glow.addColorStop(0.54, "rgba(147, 197, 253, 0.42)");
     glow.addColorStop(1, "rgba(14, 165, 233, 0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(0, 0, radius * 1.55, 0, TWO_PI);
+    ctx.arc(0, 0, radius * 1.72, 0, TWO_PI);
     ctx.fill();
 
-    ctx.fillStyle = "rgba(240, 249, 255, 0.96)";
-    ctx.strokeStyle = "rgba(2, 132, 199, 0.42)";
-    ctx.lineWidth = 1.3;
+    ctx.globalAlpha = 0.58;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
     ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.76, 0, TWO_PI);
+    ctx.arc(0, 0, radius * 0.92, 0, TWO_PI);
     ctx.fill();
-    ctx.stroke();
+    ctx.globalAlpha = 1;
 
-    ctx.strokeStyle = "#0284c7";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    for (let i = 0; i < 6; i += 1) {
-      const angle = (Math.PI / 3) * i + Math.PI / 6;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * radius * 0.22, Math.sin(angle) * radius * 0.22);
-      ctx.lineTo(Math.cos(angle) * radius * 0.62, Math.sin(angle) * radius * 0.62);
-      ctx.stroke();
+    if (snowflakeSprite.complete && snowflakeSprite.naturalWidth > 0) {
+      const drawHeight = size * 1.06;
+      const drawWidth = drawHeight * (snowflakeSprite.naturalWidth / snowflakeSprite.naturalHeight);
+      ctx.drawImage(snowflakeSprite, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      ctx.restore();
+      return;
     }
 
-    ctx.fillStyle = "#7dd3fc";
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.18, 0, TWO_PI);
-    ctx.fill();
+    drawFallbackSnowflake(radius);
     ctx.restore();
+  }
+
+  function drawFallbackSnowflake(radius) {
+    ctx.strokeStyle = "#bfdbfe";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (Math.PI / 3) * i - Math.PI / 2;
+      const inner = radius * 0.2;
+      const outer = radius * 1.05;
+      const branch = radius * 0.34;
+      const sx = Math.cos(angle);
+      const sy = Math.sin(angle);
+
+      ctx.beginPath();
+      ctx.moveTo(sx * inner, sy * inner);
+      ctx.lineTo(sx * outer, sy * outer);
+      ctx.stroke();
+
+      for (const side of [-1, 1]) {
+        const branchAngle = angle + side * 0.72;
+        const baseX = sx * radius * 0.66;
+        const baseY = sy * radius * 0.66;
+        ctx.beginPath();
+        ctx.moveTo(baseX, baseY);
+        ctx.lineTo(
+          baseX + Math.cos(branchAngle) * branch,
+          baseY + Math.sin(branchAngle) * branch,
+        );
+        ctx.stroke();
+      }
+    }
   }
 
   function drawShieldPickup(x, y, radius, seed) {

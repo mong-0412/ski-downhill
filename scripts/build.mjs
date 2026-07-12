@@ -18,6 +18,7 @@ const assetFiles = [
   "skier-boost.png",
   "skier-left.png",
   "skier-straight.png",
+  "snowflake-pickup.png",
   "splash-banner.png",
 ];
 
