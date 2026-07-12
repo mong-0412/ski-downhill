@@ -1,4 +1,4 @@
-const CACHE_NAME = "ski-downhill-v29";
+const CACHE_NAME = "ski-downhill-v30";
 const ASSETS = [
   "./",
   "./index.html",
@@ -12,6 +12,7 @@ const ASSETS = [
   "./assets/skier-boost.png",
   "./assets/ski-loop.wav",
   "./assets/snowflake-pickup.png",
+  "./assets/honfleur-heavy-italic.otf",
 ];
 
 self.addEventListener("install", (event) => {

@@ -21,6 +21,7 @@ const assetFiles = [
   "ski-loop.wav",
   "snowflake-pickup.png",
   "splash-banner.png",
+  "honfleur-heavy-italic.otf",
 ];
 
 function parseEnvFile(content) {

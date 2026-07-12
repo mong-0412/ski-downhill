@@ -23,6 +23,7 @@ const mimeTypes = new Map([
   [".webmanifest", "application/manifest+json; charset=utf-8"],
   [".svg", "image/svg+xml"],
   [".png", "image/png"],
+  [".otf", "font/otf"],
   [".ico", "image/x-icon"],
 ]);
 

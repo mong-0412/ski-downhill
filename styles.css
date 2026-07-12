@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Honfleur";
+  src: url("./assets/honfleur-heavy-italic.otf") format("opentype");
+  font-style: italic;
+  font-weight: 900;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
@@ -78,17 +86,19 @@ button {
   grid-template-columns: minmax(72px, 0.9fr) minmax(100px, 1.35fr) minmax(72px, 0.9fr);
   align-items: center;
   width: min(calc(100vw - 24px), 392px);
-  min-height: 62px;
-  padding: 7px 13px 8px;
+  min-height: 54px;
+  padding: 6px 12px 7px;
   transform: translateX(-50%);
-  border: 2px solid rgba(231, 243, 255, 0.9);
-  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 18px;
   background:
-    linear-gradient(110deg, rgba(20, 115, 237, 0.94), rgba(7, 36, 90, 0.96) 66%),
-    var(--navy-900);
+    linear-gradient(115deg, rgba(20, 115, 237, 0.48), rgba(4, 21, 55, 0.58) 68%),
+    rgba(7, 36, 90, 0.46);
   box-shadow:
-    0 5px 0 rgba(4, 21, 55, 0.82),
-    0 10px 22px rgba(4, 21, 55, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 8px 24px rgba(4, 21, 55, 0.18);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
+  backdrop-filter: blur(14px) saturate(1.35);
   color: var(--white);
   pointer-events: none;
 }
@@ -96,9 +106,9 @@ button {
 .hud::after {
   position: absolute;
   right: 10px;
-  bottom: 5px;
-  width: 44px;
-  height: 3px;
+  bottom: 4px;
+  width: 38px;
+  height: 2px;
   transform: skewX(-35deg);
   background: var(--cyan-500);
   box-shadow: -14px 0 0 rgba(255, 255, 255, 0.35);
@@ -146,7 +156,7 @@ button {
   font-variant-numeric: tabular-nums;
   line-height: 1;
   letter-spacing: -0.055em;
-  text-shadow: 0 2px 0 rgba(4, 21, 55, 0.5);
+  text-shadow: 0 1px 5px rgba(4, 21, 55, 0.48);
 }
 
 .metric-score strong {
@@ -162,11 +172,11 @@ button {
 
 .itembar {
   position: fixed;
-  top: calc(max(8px, env(safe-area-inset-top)) + 72px);
+  top: calc(max(8px, env(safe-area-inset-top)) + 62px);
   left: 50%;
   z-index: 5;
   display: flex;
-  gap: 8px;
+  gap: 7px;
   justify-content: center;
   width: min(calc(100vw - 24px), 392px);
   transform: translateX(-50%);
@@ -177,22 +187,26 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 82px;
-  min-height: 40px;
-  gap: 7px;
-  padding: 5px 10px;
-  border: 2px solid rgba(231, 243, 255, 0.88);
-  border-radius: 12px;
-  background: rgba(7, 36, 90, 0.9);
-  box-shadow: 0 3px 0 rgba(4, 21, 55, 0.68);
+  min-width: 78px;
+  min-height: 36px;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 13px;
+  background: rgba(7, 36, 90, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 6px 18px rgba(4, 21, 55, 0.14);
+  -webkit-backdrop-filter: blur(12px) saturate(1.25);
+  backdrop-filter: blur(12px) saturate(1.25);
   color: var(--white);
 }
 
 .item-icon {
   display: block;
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 .bonus-pill {
@@ -250,10 +264,10 @@ button {
 #shieldPill.is-active {
   opacity: 1;
   transform: translateY(-1px);
-  border-color: #c7f5ff;
-  background: linear-gradient(135deg, #0a55d8, #0d8fdc);
+  border-color: rgba(199, 245, 255, 0.82);
+  background: linear-gradient(135deg, rgba(10, 85, 216, 0.7), rgba(13, 143, 220, 0.62));
   box-shadow:
-    0 3px 0 #052d73,
+    0 6px 18px rgba(5, 45, 115, 0.2),
     0 0 0 3px rgba(25, 189, 229, 0.18);
 }
 
@@ -267,7 +281,7 @@ button {
 
 .sound-toggle:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 rgba(4, 21, 55, 0.68);
+  box-shadow: 0 3px 10px rgba(4, 21, 55, 0.14);
 }
 
 .sound-icon,
@@ -360,7 +374,7 @@ button {
   top: max(24px, env(safe-area-inset-top));
   left: 50%;
   width: min(calc(100vw - 28px), 410px);
-  height: min(43dvh, 370px);
+  height: min(40dvh, 338px);
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -372,17 +386,18 @@ button {
   z-index: 2;
   display: grid;
   justify-items: start;
-  transform: skewX(-7deg);
+  transform: rotate(-2deg);
   color: var(--navy-900);
   text-align: left;
 }
 
 .brand-wordmark strong {
-  font-family: "Arial Black", Impact, Pretendard, system-ui, sans-serif;
-  font-size: clamp(48px, 15vw, 68px);
+  font-family: "Honfleur", "Arial Black", Impact, sans-serif;
+  font-size: clamp(54px, 17vw, 76px);
+  font-style: italic;
   font-weight: 900;
-  line-height: 0.82;
-  letter-spacing: -0.11em;
+  line-height: 0.78;
+  letter-spacing: 0.01em;
   text-shadow:
     3px 3px 0 #ffffff,
     6px 6px 0 rgba(20, 115, 237, 0.24);
@@ -410,10 +425,10 @@ button {
 .brand-hero > img {
   position: absolute;
   right: 4px;
-  bottom: -6px;
+  bottom: 4px;
   z-index: 1;
   width: auto;
-  height: min(31dvh, 255px);
+  height: min(29dvh, 238px);
   filter: drop-shadow(0 13px 14px rgba(4, 21, 55, 0.2));
   object-fit: contain;
 }
@@ -474,8 +489,9 @@ button {
 
 .overlay.is-splash .overlay-panel {
   width: min(100%, 410px);
-  max-height: 55dvh;
-  padding: 14px 15px 15px;
+  max-height: 66dvh;
+  padding: 12px 14px 13px;
+  transform: translateY(-12px);
   border-color: #1b62d2;
   border-radius: 24px;
   background:
@@ -547,15 +563,15 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 7px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .control-step {
   display: grid;
   grid-template-columns: auto 18px 1fr;
   align-items: center;
-  min-height: 44px;
-  padding: 5px 7px;
+  min-height: 40px;
+  padding: 4px 7px;
   border: 2px solid #c3dcfb;
   border-radius: 12px;
   background: #e8f4ff;
@@ -650,7 +666,7 @@ h2 {
 .player-form {
   display: grid;
   gap: 9px;
-  margin-top: 12px;
+  margin-top: 9px;
 }
 
 .name-field {
@@ -670,7 +686,7 @@ h2 {
 #nickname {
   width: 100%;
   min-width: 0;
-  min-height: 46px;
+  min-height: 44px;
   padding: 0 13px;
   border: 2px solid #9fc4f1;
   border-radius: 11px;
@@ -697,7 +713,7 @@ h2 {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 54px;
+  min-height: 52px;
   gap: 9px;
   padding: 0 20px;
   transform: translateY(0);
@@ -756,8 +772,8 @@ h2 {
 /* Ranking board */
 
 .leaderboard-panel {
-  margin-top: 11px;
-  padding: 9px 10px 7px;
+  margin-top: 8px;
+  padding: 7px 9px 5px;
   border: 2px solid #9fc4f1;
   border-radius: 14px;
   background: #ddecff;
@@ -849,8 +865,8 @@ h2 {
   grid-template-columns: 26px minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
-  min-height: 30px;
-  padding: 4px 2px;
+  min-height: 28px;
+  padding: 3px 2px;
   border-bottom: 1px solid rgba(10, 52, 125, 0.12);
   color: #284a79;
   font-size: 12px;
@@ -981,15 +997,16 @@ h2 {
 
 @media (max-height: 740px) and (orientation: portrait) {
   .brand-hero {
-    height: 38dvh;
+    height: 34dvh;
   }
 
   .brand-hero > img {
-    height: min(27dvh, 210px);
+    height: min(24dvh, 190px);
   }
 
   .overlay.is-splash .overlay-panel {
-    max-height: 59dvh;
+    max-height: 69dvh;
+    transform: translateY(-8px);
   }
 
   .control-guide {
@@ -1011,7 +1028,8 @@ h2 {
   }
 
   .overlay.is-splash .overlay-panel {
-    max-height: 61dvh;
+    max-height: 64dvh;
+    transform: translateY(-6px);
   }
 }
 
@@ -1036,7 +1054,7 @@ h2 {
   }
 
   .brand-wordmark strong {
-    font-size: 45px;
+    font-size: 51px;
   }
 
   .overlay.is-splash .overlay-panel {
