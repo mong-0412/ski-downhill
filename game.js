@@ -17,6 +17,7 @@
   const overlayText = document.getElementById("overlayText");
   const distanceResult = document.getElementById("distanceResult");
   const bonusResult = document.getElementById("bonusResult");
+  const firstPlacePrize = document.getElementById("firstPlacePrize");
   const playerForm = document.getElementById("playerForm");
   const nicknameInput = document.getElementById("nickname");
   const startButton = document.getElementById("startButton");
@@ -32,6 +33,7 @@
   const SKI_LOOP_SRC = "./assets/ski-loop.wav";
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
+  const SCORE_SUBMIT_TIMEOUT_MS = 8000;
   const LEADERBOARD_NO_CACHE_HEADERS = {
     "Cache-Control": "no-cache, no-store, max-age=0",
     Pragma: "no-cache",
@@ -93,6 +95,7 @@
     deathDistance: 0,
     newBest: false,
     scoreSubmitted: false,
+    scoreSubmissionPending: false,
   };
 
   const sound = createSoundController();
@@ -675,6 +678,20 @@
     return Math.floor(state.distance) + state.bonusScore;
   }
 
+  async function fetchWithTimeout(url, options, timeoutMs) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
   function createSupabaseClient(config) {
     const supabaseUrl = typeof config.supabaseUrl === "string"
       ? config.supabaseUrl.replace(/\/+$/, "")
@@ -713,45 +730,59 @@
         return response.json();
       },
       async submit(entry) {
-        const response = await fetch(`${supabaseUrl}/rest/v1/rpc/submit_leaderboard_score`, {
+        const requestBody = JSON.stringify({
+          p_nickname: entry.nickname,
+          p_score: entry.score,
+          p_distance: entry.distance,
+          p_bonus: entry.bonus,
+        });
+        const response = await fetchWithTimeout(`${supabaseUrl}/rest/v1/rpc/submit_leaderboard_score_v2`, {
           method: "POST",
           headers: {
             ...baseHeaders,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            p_nickname: entry.nickname,
-            p_score: entry.score,
-            p_distance: entry.distance,
-            p_bonus: entry.bonus,
-          }),
-        });
+          body: requestBody,
+        }, SCORE_SUBMIT_TIMEOUT_MS);
 
-        if (!response.ok) {
+        if (response.ok) {
+          const result = await response.json();
+          if (!result || !Array.isArray(result.entries)) {
+            throw new Error("Invalid Supabase score RPC response");
+          }
+
+          return {
+            entries: result.entries,
+            isNewFirstPlace: result.isNewFirstPlace === true,
+          };
+        }
+
+        if (response.status !== 404) {
           throw new Error("Supabase score RPC failed");
         }
 
-        return response.json();
-      },
-      async insert(entry) {
-        const response = await fetch(`${supabaseUrl}/rest/v1/leaderboard`, {
+        const responseError = await response.json().catch(() => ({}));
+        if (responseError.code !== "PGRST202") {
+          throw new Error("Supabase score RPC unavailable");
+        }
+
+        const legacyResponse = await fetchWithTimeout(`${supabaseUrl}/rest/v1/rpc/submit_leaderboard_score`, {
           method: "POST",
           headers: {
             ...baseHeaders,
             "Content-Type": "application/json",
-            Prefer: "return=minimal",
           },
-          body: JSON.stringify({
-            nickname: entry.nickname,
-            score: entry.score,
-            distance: entry.distance,
-            bonus: entry.bonus,
-          }),
-        });
+          body: requestBody,
+        }, SCORE_SUBMIT_TIMEOUT_MS);
 
-        if (!response.ok) {
-          throw new Error("Supabase score submit failed");
+        if (!legacyResponse.ok) {
+          throw new Error("Supabase legacy score RPC failed");
         }
+
+        return {
+          entries: await legacyResponse.json(),
+          isNewFirstPlace: false,
+        };
       },
     };
   }
@@ -844,6 +875,15 @@
     refreshLeaderboardButton.setAttribute("aria-label", "랭킹 새로고침");
   }
 
+  function hideFirstPlacePrize() {
+    firstPlacePrize.hidden = true;
+  }
+
+  function showFirstPlacePrize() {
+    if (state.mode !== "gameover") return;
+    firstPlacePrize.hidden = false;
+  }
+
   function renderLeaderboard(entries) {
     const normalized = sortLeaderboard(entries);
     leaderboardList.replaceChildren();
@@ -924,6 +964,9 @@
 
   async function submitScore(score) {
     const requestId = beginLeaderboardRequest("기록 저장 중...");
+    state.scoreSubmissionPending = true;
+    startButton.disabled = true;
+    startButtonLabel.textContent = "기록 확인 중...";
     const entry = {
       nickname: state.playerName,
       score,
@@ -934,17 +977,13 @@
 
     try {
       if (supabaseClient) {
-        let entries;
-        try {
-          entries = await supabaseClient.submit(entry);
-        } catch {
-          await supabaseClient.insert(entry);
-          entries = await supabaseClient.list(LEADERBOARD_FETCH_LIMIT);
-        }
+        const submission = await supabaseClient.submit(entry);
 
+        if (submission.isNewFirstPlace === true) showFirstPlacePrize();
         if (!isCurrentLeaderboardRequest(requestId)) return;
+        const normalizedEntries = Array.isArray(submission.entries) ? submission.entries : [];
         state.leaderboardOnline = true;
-        renderLeaderboard(Array.isArray(entries) ? entries : []);
+        renderLeaderboard(normalizedEntries);
         setLeaderboardStatus("");
         return;
       }
@@ -963,15 +1002,22 @@
 
       const data = await response.json();
       if (!isCurrentLeaderboardRequest(requestId)) return;
+      const normalizedEntries = Array.isArray(data.entries) ? data.entries : [];
       state.leaderboardOnline = true;
-      renderLeaderboard(Array.isArray(data.entries) ? data.entries : []);
+      renderLeaderboard(normalizedEntries);
       setLeaderboardStatus("");
     } catch {
+      const localEntries = saveLocalLeaderboardEntry(entry);
       if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = false;
-      renderLeaderboard(saveLocalLeaderboardEntry(entry));
+      renderLeaderboard(localEntries);
       setLeaderboardStatus("오프라인 기록으로 저장했어요.");
     } finally {
+      state.scoreSubmissionPending = false;
+      startButton.disabled = false;
+      if (state.mode === "gameover") {
+        startButtonLabel.textContent = "한 번 더!";
+      }
       finishLeaderboardRequest(requestId);
     }
   }
@@ -1048,6 +1094,7 @@
     overlay.dataset.mode = mode;
 
     if (mode === "running") {
+      hideFirstPlacePrize();
       overlay.classList.add("is-hidden");
       overlay.classList.remove("is-splash");
       return;
@@ -1056,6 +1103,7 @@
     overlay.classList.remove("is-hidden");
 
     if (mode === "ready") {
+      hideFirstPlacePrize();
       overlay.classList.add("is-splash");
       overlayKicker.textContent = "HOW TO RIDE";
       overlayTitle.textContent = "씽씽 스키";
@@ -1078,6 +1126,7 @@
   }
 
   function resetRun() {
+    if (state.scoreSubmissionPending) return;
     void sound.unlock();
     sound.startSkiLoop();
     savePlayerName(nicknameInput.value);
@@ -1113,6 +1162,7 @@
     sound.stopSkiLoop();
     sound.play("crash");
     saveBest(state.deathDistance);
+    hideFirstPlacePrize();
     setOverlay("gameover");
     if (!state.scoreSubmitted) {
       state.scoreSubmitted = true;
@@ -2092,6 +2142,7 @@
 
   playerForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (state.scoreSubmissionPending) return;
     void sound.unlock();
     if (state.mode !== "running") resetRun();
   });

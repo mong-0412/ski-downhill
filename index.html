@@ -60,7 +60,7 @@
       </button>
     </section>
 
-    <section class="overlay is-splash" id="overlay" aria-live="polite">
+    <section class="overlay is-splash" id="overlay">
       <div class="brand-hero" aria-hidden="true">
         <div class="brand-speed-lines"><i></i><i></i><i></i></div>
         <div class="brand-wordmark">
@@ -72,7 +72,7 @@
       </div>
 
       <div class="overlay-panel">
-        <header class="overlay-copy">
+        <header class="overlay-copy" aria-live="polite" aria-atomic="true">
           <p class="eyebrow" id="overlayKicker">HOW TO RIDE</p>
           <h1 id="overlayTitle">씽씽 스키</h1>
           <p id="overlayText">터치한 쪽의 반대 방향으로 카빙하세요.</p>
@@ -101,6 +101,17 @@
             <span>눈결정</span>
             <strong id="bonusResult">+0</strong>
           </div>
+        </div>
+
+        <div class="first-place-prize" id="firstPlacePrize" role="status" aria-live="polite" aria-atomic="true" hidden>
+          <span class="first-place-prize-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 10h16v10H4V10Z"/>
+              <path d="M3 6h18v4H3V6ZM12 6v14"/>
+              <path d="M12 6H8.8a2.3 2.3 0 1 1 2.3-2.3L12 6Zm0 0h3.2a2.3 2.3 0 1 0-2.3-2.3L12 6Z"/>
+            </svg>
+          </span>
+          <p><strong>축하드립니다!!</strong> SSING 부스로 오셔서 키캡 키링을 받아가세요!!</p>
         </div>
 
         <div class="leaderboard-panel" aria-label="리더보드">

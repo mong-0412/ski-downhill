@@ -648,6 +648,70 @@ h2 {
   display: none;
 }
 
+.first-place-prize[hidden] {
+  display: none;
+}
+
+.first-place-prize {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-top: 9px;
+  padding: 9px 11px;
+  border: 2px solid #f0b72f;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 12% 15%, rgba(255, 255, 255, 0.9), transparent 35%),
+    linear-gradient(135deg, #fff8c8 0%, #ffe27b 100%);
+  box-shadow:
+    0 4px 0 #bf7814,
+    0 8px 18px rgba(128, 77, 8, 0.18);
+  color: #4b2c03;
+  text-align: left;
+  animation: prize-pop 360ms cubic-bezier(0.2, 1.2, 0.35, 1) both;
+}
+
+.first-place-prize-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: #fffdf0;
+  color: #d78508;
+  box-shadow: inset 0 0 0 2px rgba(215, 133, 8, 0.2);
+}
+
+.first-place-prize-icon svg {
+  width: 27px;
+  height: 27px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.first-place-prize p {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.42;
+  word-break: keep-all;
+}
+
+.first-place-prize strong {
+  display: block;
+  color: #a85500;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.overlay.is-splash .first-place-prize {
+  display: none;
+}
+
 .overlay:not(.is-splash) .brand-hero,
 .overlay:not(.is-splash) .control-guide,
 .overlay:not(.is-splash) .name-field {
@@ -761,6 +825,12 @@ h2 {
     0 5px 12px rgba(10, 85, 216, 0.2);
 }
 
+#startButton:disabled {
+  cursor: wait;
+  filter: saturate(0.72);
+  opacity: 0.78;
+}
+
 #startButton:focus-visible,
 #nickname:focus-visible,
 #refreshLeaderboard:focus-visible,
@@ -850,6 +920,17 @@ h2 {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes prize-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
