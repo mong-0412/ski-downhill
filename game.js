@@ -495,7 +495,8 @@
       const speedProgress = clamp((state.speed - BASE_SPEED) / (MAX_SPEED - BASE_SPEED), 0, 1);
       const duration = 0.225 + speedProgress * 0.035 + Math.random() * 0.015;
       const reversalBoost = options.reversal ? 1.08 : 1;
-      const bodyPeak = (0.061 + speedProgress * 0.012) * reversalBoost;
+      const turnVolume = 1.65;
+      const bodyPeak = (0.061 + speedProgress * 0.012) * reversalBoost * turnVolume;
       const source = audio.createBufferSource();
       const snowHighpass = audio.createBiquadFilter();
       const snowLowpass = audio.createBiquadFilter();
@@ -534,7 +535,10 @@
       edgeBandpass.Q.value = 0.62;
 
       edgeGain.gain.setValueAtTime(0.0001, now);
-      edgeGain.gain.linearRampToValueAtTime(0.021 + speedProgress * 0.006, now + 0.05);
+      edgeGain.gain.linearRampToValueAtTime(
+        (0.021 + speedProgress * 0.006) * turnVolume,
+        now + 0.05,
+      );
       edgeGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.86);
 
       output.gain.value = 1;
