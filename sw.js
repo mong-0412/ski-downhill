@@ -1,4 +1,4 @@
-const CACHE_NAME = "ski-downhill-v17";
+const CACHE_NAME = "ski-downhill-v18";
 const ASSETS = [
   "./",
   "./index.html",
@@ -32,7 +32,16 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   if (url.pathname.startsWith("/api/") || url.pathname.endsWith("/config.js")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  if (event.request.cache === "reload" || event.request.cache === "no-store") {
     event.respondWith(fetch(event.request));
     return;
   }

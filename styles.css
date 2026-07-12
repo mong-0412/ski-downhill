@@ -354,6 +354,11 @@ h2 {
   font-weight: 850;
 }
 
+#refreshLeaderboard:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .leaderboard-list {
   display: grid;
   gap: 6px;

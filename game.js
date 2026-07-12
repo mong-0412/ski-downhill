@@ -25,6 +25,10 @@
   const LOCAL_LEADERBOARD_KEY = "ski-downhill-local-leaderboard-v1";
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
+  const LEADERBOARD_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, max-age=0",
+    Pragma: "no-cache",
+  };
   const BASE_SPEED = 8.5;
   const MAX_SPEED = 29;
   const FAST_DROP_MULTIPLIER = 1.55;
@@ -75,6 +79,7 @@
     best: readBest(),
     playerName: readPlayerName(),
     leaderboardOnline: true,
+    leaderboardRequestId: 0,
     idleTime: 0,
     deathDistance: 0,
     scoreSubmitted: false,
@@ -161,6 +166,10 @@
       apikey: supabaseAnonKey,
       Authorization: `Bearer ${supabaseAnonKey}`,
     };
+    const readHeaders = {
+      ...baseHeaders,
+      ...LEADERBOARD_NO_CACHE_HEADERS,
+    };
 
     return {
       async list(limit) {
@@ -170,7 +179,7 @@
           limit: String(limit),
         });
         const response = await fetch(`${supabaseUrl}/rest/v1/leaderboard?${query}`, {
-          headers: baseHeaders,
+          headers: readHeaders,
           cache: "no-store",
         });
 
@@ -292,6 +301,33 @@
     leaderboardStatus.textContent = message;
   }
 
+  function beginLeaderboardRequest(message) {
+    state.leaderboardRequestId += 1;
+    refreshLeaderboardButton.disabled = true;
+    refreshLeaderboardButton.textContent = "불러오는 중";
+    setLeaderboardStatus(message);
+    return state.leaderboardRequestId;
+  }
+
+  function isCurrentLeaderboardRequest(requestId) {
+    return requestId === state.leaderboardRequestId;
+  }
+
+  function finishLeaderboardRequest(requestId) {
+    if (!isCurrentLeaderboardRequest(requestId)) return;
+    refreshLeaderboardButton.disabled = false;
+    refreshLeaderboardButton.textContent = "새로고침";
+  }
+
+  function leaderboardSyncedMessage(prefix) {
+    const time = new Date().toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    return `${prefix} · ${time} 업데이트`;
+  }
+
   function renderLeaderboard(entries) {
     const normalized = sortLeaderboard(entries);
     leaderboardList.replaceChildren();
@@ -328,18 +364,20 @@
   }
 
   async function loadLeaderboard(message = "리더보드를 불러오는 중입니다.") {
-    setLeaderboardStatus(message);
+    const requestId = beginLeaderboardRequest(message);
 
     try {
       if (supabaseClient) {
         const entries = await supabaseClient.list(LEADERBOARD_FETCH_LIMIT);
+        if (!isCurrentLeaderboardRequest(requestId)) return;
         state.leaderboardOnline = true;
         renderLeaderboard(Array.isArray(entries) ? entries : []);
-        setLeaderboardStatus("Supabase 리더보드가 연결되어 있습니다.");
+        setLeaderboardStatus(leaderboardSyncedMessage("Supabase 리더보드 연결됨"));
         return;
       }
 
       const response = await fetch(`./api/leaderboard?limit=${LEADERBOARD_LIMIT}`, {
+        headers: LEADERBOARD_NO_CACHE_HEADERS,
         cache: "no-store",
       });
 
@@ -348,17 +386,22 @@
       }
 
       const data = await response.json();
+      if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = true;
       renderLeaderboard(Array.isArray(data.entries) ? data.entries : []);
-      setLeaderboardStatus("로컬 리더보드가 연결되어 있습니다.");
+      setLeaderboardStatus(leaderboardSyncedMessage("로컬 리더보드 연결됨"));
     } catch {
+      if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = false;
       renderLeaderboard(readLocalLeaderboard());
       setLeaderboardStatus("서버 연결 전이라 이 기기 기록만 표시됩니다.");
+    } finally {
+      finishLeaderboardRequest(requestId);
     }
   }
 
   async function submitScore(score) {
+    const requestId = beginLeaderboardRequest("점수를 제출하는 중입니다.");
     const entry = {
       nickname: state.playerName,
       score,
@@ -366,8 +409,6 @@
       bonus: state.bonusScore,
       createdAt: new Date().toISOString(),
     };
-
-    setLeaderboardStatus("점수를 제출하는 중입니다.");
 
     try {
       if (supabaseClient) {
@@ -379,9 +420,10 @@
           entries = await supabaseClient.list(LEADERBOARD_FETCH_LIMIT);
         }
 
+        if (!isCurrentLeaderboardRequest(requestId)) return;
         state.leaderboardOnline = true;
         renderLeaderboard(Array.isArray(entries) ? entries : []);
-        setLeaderboardStatus("점수가 Supabase 리더보드에 반영되었습니다.");
+        setLeaderboardStatus(leaderboardSyncedMessage("점수가 Supabase 리더보드에 반영됨"));
         return;
       }
 
@@ -398,13 +440,17 @@
       }
 
       const data = await response.json();
+      if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = true;
       renderLeaderboard(Array.isArray(data.entries) ? data.entries : []);
-      setLeaderboardStatus("점수가 리더보드에 반영되었습니다.");
+      setLeaderboardStatus(leaderboardSyncedMessage("점수가 리더보드에 반영됨"));
     } catch {
+      if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = false;
       renderLeaderboard(saveLocalLeaderboardEntry(entry));
       setLeaderboardStatus("서버 저장 실패: 이 기기 기록으로 저장했습니다.");
+    } finally {
+      finishLeaderboardRequest(requestId);
     }
   }
 
