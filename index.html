@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f766e">
+  <meta name="theme-color" content="#0a347d">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,56 +17,125 @@
     <canvas id="game" aria-label="플레이 가능한 다운힐 스키 게임 캔버스"></canvas>
 
     <section class="hud" aria-label="점수판">
-      <div class="metric">
-        <span>점수</span>
-        <strong><span id="score">0</span>점</strong>
+      <div class="metric metric-score">
+        <span>SCORE</span>
+        <strong><span id="score">0</span></strong>
       </div>
-      <div class="metric">
-        <span>최고</span>
-        <strong><span id="best">0</span>점</strong>
+      <div class="metric metric-best">
+        <span>BEST</span>
+        <strong><span id="best">0</span></strong>
       </div>
-      <div class="metric compact">
-        <span>속도</span>
+      <div class="metric metric-speed">
+        <span>KM/H</span>
         <strong><span id="speed">0</span></strong>
       </div>
     </section>
 
     <section class="itembar" aria-label="아이템 상태">
-      <div class="item-pill">
-        <span>보너스</span>
-        <strong><span id="bonus">0</span></strong>
+      <div class="item-pill bonus-pill">
+        <img class="item-icon snow-icon" src="./assets/snowflake-pickup.png" alt="">
+        <span class="item-copy">
+          <span>BONUS</span>
+          <strong>+<span id="bonus">0</span></strong>
+        </span>
       </div>
       <div class="item-pill" id="shieldPill">
-        <span>방패</span>
-        <strong><span id="shield">0</span></strong>
+        <svg class="item-icon shield-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.5 20 6v5.4c0 5.1-3.2 8.4-8 10.1-4.8-1.7-8-5-8-10.1V6l8-3.5Z"/>
+          <path d="m8.7 12 2.1 2.1 4.6-4.7"/>
+        </svg>
+        <span class="item-copy">
+          <span>SHIELD</span>
+          <strong>×<span id="shield">0</span></strong>
+        </span>
       </div>
       <button class="item-pill sound-toggle" id="soundToggle" type="button" aria-label="효과음 켜짐" aria-pressed="true">
-        <span id="soundIcon" aria-hidden="true">♪</span>
+        <span class="sound-icon" id="soundIcon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path class="speaker-body" d="M4 9h4l5-4v14l-5-4H4V9Z"/>
+            <path class="sound-waves" d="M16 9.2c1.3 1.5 1.3 4.1 0 5.6M18.7 6.7c3.1 3 3.1 7.6 0 10.6"/>
+            <path class="sound-slash" d="m5 4 14 16"/>
+          </svg>
+        </span>
       </button>
     </section>
 
     <section class="overlay is-splash" id="overlay" aria-live="polite">
+      <div class="brand-hero" aria-hidden="true">
+        <div class="brand-speed-lines"><i></i><i></i><i></i></div>
+        <div class="brand-wordmark">
+          <strong>씽씽</strong>
+          <span>SKI DOWNHILL</span>
+          <small>RAPID DESCENT</small>
+        </div>
+        <img src="./assets/skier-straight.png" alt="">
+      </div>
+
       <div class="overlay-panel">
-        <p class="eyebrow" id="overlayKicker">모바일 스키런</p>
-        <h1 id="overlayTitle">씽씽 스키</h1>
-        <p id="overlayText">왼쪽을 누르면 오른쪽으로, 오른쪽을 누르면 왼쪽으로 이동합니다. 눈결정은 보너스 점수, 방패는 충돌을 한 번 막아줍니다.</p>
-        <form class="player-form" id="playerForm">
-          <label for="nickname">닉네임</label>
-          <div class="name-row">
-            <input id="nickname" name="nickname" type="text" maxlength="12" autocomplete="nickname" inputmode="text" placeholder="닉네임 입력">
-            <button id="startButton" type="submit">시작하기</button>
+        <header class="overlay-copy">
+          <p class="eyebrow" id="overlayKicker">HOW TO RIDE</p>
+          <h1 id="overlayTitle">씽씽 스키</h1>
+          <p id="overlayText">터치한 쪽의 반대 방향으로 카빙하세요.</p>
+        </header>
+
+        <div class="control-guide" aria-label="조작 방법">
+          <div class="control-step">
+            <span class="touch-key">LEFT</span>
+            <span class="control-arrow" aria-hidden="true">→</span>
+            <strong>오른쪽 카빙</strong>
           </div>
-        </form>
+          <div class="control-step">
+            <span class="touch-key">RIGHT</span>
+            <span class="control-arrow" aria-hidden="true">←</span>
+            <strong>왼쪽 카빙</strong>
+          </div>
+          <p>양쪽을 같이 누르면 부스터!</p>
+        </div>
+
+        <div class="result-breakdown" aria-label="이번 주행 결과">
+          <div>
+            <span>주행 점수</span>
+            <strong id="distanceResult">0</strong>
+          </div>
+          <div>
+            <span>눈결정</span>
+            <strong id="bonusResult">+0</strong>
+          </div>
+        </div>
+
         <div class="leaderboard-panel" aria-label="리더보드">
           <div class="leaderboard-head">
-            <strong>리더보드</strong>
-            <button id="refreshLeaderboard" type="button">새로고침</button>
+            <span class="ranking-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 4h10v4c0 3.2-2 5.8-5 6.8C9 13.8 7 11.2 7 8V4Z"/>
+                <path d="M7 6H4v1c0 2.2 1.3 3.8 3.4 4.2M17 6h3v1c0 2.2-1.3 3.8-3.4 4.2M12 15v3M8.5 21h7"/>
+              </svg>
+            </span>
+            <strong>SSING RANKING</strong>
+            <button id="refreshLeaderboard" type="button" aria-label="랭킹 새로고침" title="랭킹 새로고침">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M19.2 8A8 8 0 1 0 20 14M19.2 8V3.8M19.2 8H15"/>
+              </svg>
+            </button>
           </div>
           <ol class="leaderboard-list" id="leaderboardList">
-            <li class="is-empty">기록을 불러오는 중입니다.</li>
+            <li class="is-empty">기록 확인 중...</li>
           </ol>
           <p class="leaderboard-status" id="leaderboardStatus"></p>
         </div>
+
+        <form class="player-form" id="playerForm">
+          <div class="name-field">
+            <label for="nickname">SKIER NAME</label>
+            <input id="nickname" name="nickname" type="text" maxlength="12" autocomplete="nickname" inputmode="text" placeholder="이름을 정해 주세요">
+          </div>
+          <button id="startButton" type="submit">
+            <span>슬로프 출발!</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h13M13 6l6 6-6 6"/>
+            </svg>
+          </button>
+        </form>
       </div>
     </section>
 

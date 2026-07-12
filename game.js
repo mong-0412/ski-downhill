@@ -7,17 +7,20 @@
   const bestEl = document.getElementById("best");
   const speedEl = document.getElementById("speed");
   const bonusEl = document.getElementById("bonus");
+  const bonusPill = document.querySelector(".bonus-pill");
   const shieldEl = document.getElementById("shield");
   const shieldPill = document.getElementById("shieldPill");
   const soundToggleButton = document.getElementById("soundToggle");
-  const soundIcon = document.getElementById("soundIcon");
   const overlay = document.getElementById("overlay");
   const overlayKicker = document.getElementById("overlayKicker");
   const overlayTitle = document.getElementById("overlayTitle");
   const overlayText = document.getElementById("overlayText");
+  const distanceResult = document.getElementById("distanceResult");
+  const bonusResult = document.getElementById("bonusResult");
   const playerForm = document.getElementById("playerForm");
   const nicknameInput = document.getElementById("nickname");
   const startButton = document.getElementById("startButton");
+  const startButtonLabel = startButton.querySelector("span");
   const refreshLeaderboardButton = document.getElementById("refreshLeaderboard");
   const leaderboardList = document.getElementById("leaderboardList");
   const leaderboardStatus = document.getElementById("leaderboardStatus");
@@ -88,12 +91,13 @@
     leaderboardRequestId: 0,
     idleTime: 0,
     deathDistance: 0,
+    newBest: false,
     scoreSubmitted: false,
   };
 
   const sound = createSoundController();
 
-  bestEl.textContent = String(state.best);
+  bestEl.textContent = state.best.toLocaleString("ko-KR");
   speedEl.textContent = "0";
   bonusEl.textContent = "0";
   shieldEl.textContent = "0";
@@ -154,7 +158,7 @@
     } catch {
       // Some embedded browsers block storage; the current run can still display the best score.
     }
-    bestEl.textContent = String(state.best);
+    bestEl.textContent = state.best.toLocaleString("ko-KR");
   }
 
   function readSoundMuted() {
@@ -665,7 +669,6 @@
     soundToggleButton.classList.toggle("is-muted", muted);
     soundToggleButton.setAttribute("aria-label", muted ? "효과음 꺼짐" : "효과음 켜짐");
     soundToggleButton.setAttribute("aria-pressed", String(!muted));
-    soundIcon.textContent = muted ? "×" : "♪";
   }
 
   function currentScore() {
@@ -824,7 +827,8 @@
   function beginLeaderboardRequest(message) {
     state.leaderboardRequestId += 1;
     refreshLeaderboardButton.disabled = true;
-    refreshLeaderboardButton.textContent = "불러오는 중";
+    refreshLeaderboardButton.classList.add("is-loading");
+    refreshLeaderboardButton.setAttribute("aria-label", "랭킹 불러오는 중");
     setLeaderboardStatus(message);
     return state.leaderboardRequestId;
   }
@@ -836,16 +840,8 @@
   function finishLeaderboardRequest(requestId) {
     if (!isCurrentLeaderboardRequest(requestId)) return;
     refreshLeaderboardButton.disabled = false;
-    refreshLeaderboardButton.textContent = "새로고침";
-  }
-
-  function leaderboardSyncedMessage(prefix) {
-    const time = new Date().toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-    return `${prefix} · ${time} 업데이트`;
+    refreshLeaderboardButton.classList.remove("is-loading");
+    refreshLeaderboardButton.setAttribute("aria-label", "랭킹 새로고침");
   }
 
   function renderLeaderboard(entries) {
@@ -873,17 +869,23 @@
       const name = document.createElement("span");
       name.className = "leaderboard-name";
       name.textContent = entry.nickname;
+      if (entry.nickname === state.playerName) {
+        const me = document.createElement("span");
+        me.className = "leaderboard-me";
+        me.textContent = "ME";
+        name.append(me);
+      }
 
       const score = document.createElement("span");
       score.className = "leaderboard-score";
-      score.textContent = `${entry.score}점`;
+      score.textContent = entry.score.toLocaleString("ko-KR");
 
       item.append(rank, name, score);
       leaderboardList.append(item);
     });
   }
 
-  async function loadLeaderboard(message = "리더보드를 불러오는 중입니다.") {
+  async function loadLeaderboard(message = "") {
     const requestId = beginLeaderboardRequest(message);
 
     try {
@@ -892,7 +894,7 @@
         if (!isCurrentLeaderboardRequest(requestId)) return;
         state.leaderboardOnline = true;
         renderLeaderboard(Array.isArray(entries) ? entries : []);
-        setLeaderboardStatus(leaderboardSyncedMessage("Supabase 리더보드 연결됨"));
+        setLeaderboardStatus("");
         return;
       }
 
@@ -909,19 +911,19 @@
       if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = true;
       renderLeaderboard(Array.isArray(data.entries) ? data.entries : []);
-      setLeaderboardStatus(leaderboardSyncedMessage("로컬 리더보드 연결됨"));
+      setLeaderboardStatus("");
     } catch {
       if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = false;
       renderLeaderboard(readLocalLeaderboard());
-      setLeaderboardStatus("서버 연결 전이라 이 기기 기록만 표시됩니다.");
+      setLeaderboardStatus("오프라인 기록을 표시하고 있어요.");
     } finally {
       finishLeaderboardRequest(requestId);
     }
   }
 
   async function submitScore(score) {
-    const requestId = beginLeaderboardRequest("점수를 제출하는 중입니다.");
+    const requestId = beginLeaderboardRequest("기록 저장 중...");
     const entry = {
       nickname: state.playerName,
       score,
@@ -943,7 +945,7 @@
         if (!isCurrentLeaderboardRequest(requestId)) return;
         state.leaderboardOnline = true;
         renderLeaderboard(Array.isArray(entries) ? entries : []);
-        setLeaderboardStatus(leaderboardSyncedMessage("점수가 Supabase 리더보드에 반영됨"));
+        setLeaderboardStatus("");
         return;
       }
 
@@ -963,12 +965,12 @@
       if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = true;
       renderLeaderboard(Array.isArray(data.entries) ? data.entries : []);
-      setLeaderboardStatus(leaderboardSyncedMessage("점수가 리더보드에 반영됨"));
+      setLeaderboardStatus("");
     } catch {
       if (!isCurrentLeaderboardRequest(requestId)) return;
       state.leaderboardOnline = false;
       renderLeaderboard(saveLocalLeaderboardEntry(entry));
-      setLeaderboardStatus("서버 저장 실패: 이 기기 기록으로 저장했습니다.");
+      setLeaderboardStatus("오프라인 기록으로 저장했어요.");
     } finally {
       finishLeaderboardRequest(requestId);
     }
@@ -1043,6 +1045,8 @@
   }
 
   function setOverlay(mode) {
+    overlay.dataset.mode = mode;
+
     if (mode === "running") {
       overlay.classList.add("is-hidden");
       overlay.classList.remove("is-splash");
@@ -1053,18 +1057,24 @@
 
     if (mode === "ready") {
       overlay.classList.add("is-splash");
-      overlayKicker.textContent = "모바일 스키런";
+      overlayKicker.textContent = "HOW TO RIDE";
       overlayTitle.textContent = "씽씽 스키";
-      overlayText.textContent = "닉네임을 입력하고 기록에 도전하세요. 눈결정은 +50점, 방패는 충돌을 한 번 막아줍니다.";
-      startButton.textContent = "시작하기";
+      overlayText.textContent = "터치한 쪽의 반대 방향으로 카빙하세요.";
+      distanceResult.textContent = "0";
+      bonusResult.textContent = "+0";
+      startButtonLabel.textContent = "슬로프 출발!";
       return;
     }
 
     overlay.classList.remove("is-splash");
-    overlayKicker.textContent = `${state.deathDistance}점 기록`;
-    overlayTitle.textContent = "넘어졌어요";
-    overlayText.textContent = "점수를 리더보드에 반영합니다. 다시 시작해서 더 높은 순위를 노려보세요.";
-    startButton.textContent = "다시 시작";
+    overlayKicker.textContent = state.newBest ? "NEW BEST" : "RUN OVER";
+    overlayTitle.textContent = `${state.deathDistance.toLocaleString("ko-KR")}점`;
+    overlayText.textContent = state.newBest
+      ? "최고 기록을 새로 썼어요!"
+      : "아깝다! 바로 한 번 더 달려볼까요?";
+    distanceResult.textContent = Math.floor(state.distance).toLocaleString("ko-KR");
+    bonusResult.textContent = `+${state.bonusScore.toLocaleString("ko-KR")}`;
+    startButtonLabel.textContent = "한 번 더!";
   }
 
   function resetRun() {
@@ -1089,6 +1099,7 @@
     state.nextRowY = 16;
     state.safeCenter = 0;
     state.deathDistance = 0;
+    state.newBest = false;
     state.scoreSubmitted = false;
     generateRows();
     updateHud();
@@ -1098,6 +1109,7 @@
   function gameOver() {
     state.mode = "gameover";
     state.deathDistance = currentScore();
+    state.newBest = state.deathDistance > state.best;
     sound.stopSkiLoop();
     sound.play("crash");
     saveBest(state.deathDistance);
@@ -1259,10 +1271,11 @@
   }
 
   function updateHud() {
-    scoreEl.textContent = String(currentScore());
+    scoreEl.textContent = currentScore().toLocaleString("ko-KR");
     speedEl.textContent = String(Math.round(state.speed * 3.6));
-    bonusEl.textContent = String(state.bonusScore);
+    bonusEl.textContent = state.bonusScore.toLocaleString("ko-KR");
     shieldEl.textContent = String(state.shieldCharges);
+    bonusPill.classList.toggle("is-active", state.bonusScore > 0);
     shieldPill.classList.toggle("is-active", state.shieldCharges > 0 || state.invulnerableTime > 0);
   }
 
@@ -1315,7 +1328,7 @@
 
         if (pickup.type === "shield") {
           state.shieldCharges = Math.min(SHIELD_MAX_CHARGES, state.shieldCharges + 1);
-          addFloater("방패", "#0f766e");
+          addFloater("방패", "#0a55d8");
           sound.play("shield");
         }
       }
@@ -1349,7 +1362,7 @@
             state.shieldCharges -= 1;
             state.invulnerableTime = 0.95;
             item.cleared = true;
-            addFloater("방패 보호", "#0f766e");
+            addFloater("방패 보호", "#0a55d8");
             sound.play("block");
             updateHud();
             return;
@@ -1570,15 +1583,15 @@
 
     const glow = ctx.createRadialGradient(0, 0, radius * 0.25, 0, 0, radius * 1.55);
     glow.addColorStop(0, "rgba(204, 251, 241, 0.92)");
-    glow.addColorStop(0.62, "rgba(20, 184, 166, 0.36)");
-    glow.addColorStop(1, "rgba(15, 118, 110, 0)");
+    glow.addColorStop(0.62, "rgba(20, 115, 237, 0.36)");
+    glow.addColorStop(1, "rgba(10, 85, 216, 0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(0, 0, radius * 1.55, 0, TWO_PI);
     ctx.fill();
 
     ctx.fillStyle = "rgba(240, 253, 250, 0.96)";
-    ctx.strokeStyle = "rgba(15, 118, 110, 0.36)";
+    ctx.strokeStyle = "rgba(10, 85, 216, 0.36)";
     ctx.lineWidth = 1.3;
     ctx.beginPath();
     ctx.arc(0, 0, radius * 0.86, 0, TWO_PI);
@@ -1586,8 +1599,8 @@
     ctx.stroke();
 
     const shieldGradient = ctx.createLinearGradient(0, -radius * 0.62, 0, radius * 0.72);
-    shieldGradient.addColorStop(0, "#2dd4bf");
-    shieldGradient.addColorStop(1, "#0f766e");
+    shieldGradient.addColorStop(0, "#38bdf8");
+    shieldGradient.addColorStop(1, "#0a55d8");
     ctx.fillStyle = shieldGradient;
     ctx.beginPath();
     ctx.moveTo(0, -radius * 0.7);
@@ -1748,7 +1761,7 @@
     ctx.save();
     ctx.translate(x, y + 3);
     ctx.scale(pulse, pulse);
-    ctx.strokeStyle = `rgba(20, 184, 166, ${alpha})`;
+    ctx.strokeStyle = `rgba(20, 115, 237, ${alpha})`;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.ellipse(0, 2, 38, 50, 0, 0, TWO_PI);
@@ -1879,12 +1892,12 @@
     ctx.lineTo(22, 22);
     ctx.stroke();
 
-    ctx.fillStyle = "#ef4444";
+    ctx.fillStyle = "#1473ed";
     ctx.beginPath();
     roundedRectPath(ctx, -11, -14, 22, 28, 7);
     ctx.fill();
 
-    ctx.fillStyle = "#0f766e";
+    ctx.fillStyle = "#07245a";
     ctx.beginPath();
     ctx.arc(0, -22, 9, 0, TWO_PI);
     ctx.fill();
@@ -1896,7 +1909,7 @@
     ctx.quadraticCurveTo(1, -30, 8, -26);
     ctx.stroke();
 
-    ctx.fillStyle = "#064e3b";
+    ctx.fillStyle = "#19bde5";
     ctx.beginPath();
     ctx.arc(0, -13, 3.2, 0, TWO_PI);
     ctx.fill();
@@ -2095,7 +2108,7 @@
 
   refreshLeaderboardButton.addEventListener("click", () => {
     savePlayerName(nicknameInput.value);
-    void loadLeaderboard("리더보드를 새로고침하는 중입니다.");
+    void loadLeaderboard("기록 새로고침 중...");
   });
 
   resizeCanvas();
