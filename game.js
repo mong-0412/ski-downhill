@@ -26,7 +26,7 @@
   const PLAYER_NAME_KEY = "ski-downhill-player-name-v1";
   const LOCAL_LEADERBOARD_KEY = "ski-downhill-local-leaderboard-v1";
   const SOUND_MUTED_KEY = "ski-downhill-sound-muted-v1";
-  const SKI_LOOP_SRC = "./assets/ski-loop.mp3";
+  const SKI_LOOP_SRC = "./assets/ski-loop.wav";
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
   const LEADERBOARD_NO_CACHE_HEADERS = {
@@ -311,7 +311,7 @@
       }
 
       gain.gain.cancelScheduledValues(instance.currentTime);
-      gain.gain.setTargetAtTime(0.16, instance.currentTime, 0.08);
+      gain.gain.setTargetAtTime(0.08, instance.currentTime, 0.08);
 
       if (skiPlaying) return;
       skiPlaying = true;
