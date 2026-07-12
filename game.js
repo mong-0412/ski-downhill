@@ -74,6 +74,7 @@
     keyLeft: false,
     keyRight: false,
     pointerSides: new Map(),
+    lastSoundInput: "idle",
     rows: [],
     bonusScore: 0,
     shieldCharges: 0,
@@ -303,7 +304,7 @@
       }
 
       gain.gain.cancelScheduledValues(instance.currentTime);
-      gain.gain.setTargetAtTime(0.045, instance.currentTime, 0.08);
+      gain.gain.setTargetAtTime(0.07, instance.currentTime, 0.08);
 
       if (skiPlaying) return;
       skiPlaying = true;
@@ -398,8 +399,64 @@
       source.stop(now + duration + 0.03);
     }
 
+    function whoosh(duration, options = {}) {
+      if (!audio || !master) return;
+      const frameCount = Math.max(1, Math.floor(audio.sampleRate * duration));
+      const buffer = audio.createBuffer(1, frameCount, audio.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < frameCount; i += 1) {
+        const progress = i / frameCount;
+        const envelope = Math.sin(Math.PI * progress) ** 0.55;
+        data[i] = (Math.random() * 2 - 1) * envelope;
+      }
+
+      const source = audio.createBufferSource();
+      const filter = audio.createBiquadFilter();
+      const gain = audio.createGain();
+      const panner = audio.createStereoPanner ? audio.createStereoPanner() : null;
+      const now = audio.currentTime + (options.delay || 0);
+      const volume = options.volume || 0.07;
+
+      source.buffer = buffer;
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(options.from || 950, now);
+      filter.frequency.exponentialRampToValueAtTime(options.to || 3200, now + duration);
+      filter.Q.value = options.q || 0.8;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume, now + duration * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      source.connect(filter);
+      filter.connect(gain);
+      if (panner) {
+        panner.pan.value = options.pan || 0;
+        gain.connect(panner);
+        panner.connect(master);
+      } else {
+        gain.connect(master);
+      }
+
+      source.start(now);
+      source.stop(now + duration + 0.03);
+    }
+
     function schedule(name) {
       if (muted) return;
+
+      if (name === "turnLeft") {
+        whoosh(0.12, { from: 900, to: 2900, pan: -0.28, volume: 0.07 });
+        return;
+      }
+
+      if (name === "turnRight") {
+        whoosh(0.12, { from: 900, to: 2900, pan: 0.28, volume: 0.07 });
+        return;
+      }
+
+      if (name === "boost") {
+        whoosh(0.16, { from: 650, to: 3600, pan: 0, volume: 0.078, q: 0.72 });
+        return;
+      }
 
       if (name === "pickup") {
         tone(760, 0.07, { type: "sine", volume: 0.05 });
@@ -891,6 +948,7 @@
     state.lateralVelocity = 0;
     state.steer = 0;
     state.fastDrop = false;
+    state.lastSoundInput = "idle";
     state.pointerSides.clear();
     updateInputState();
     state.rows = [];
@@ -1727,6 +1785,7 @@
   function updateInputState() {
     let leftPressed = state.keyLeft;
     let rightPressed = state.keyRight;
+    const previousSoundInput = state.lastSoundInput;
 
     for (const side of state.pointerSides.values()) {
       if (side === "left") leftPressed = true;
@@ -1737,20 +1796,33 @@
 
     if (state.fastDrop) {
       state.steer = 0;
+      state.lastSoundInput = "boost";
+      if (state.mode === "running" && previousSoundInput !== "boost") {
+        sound.play("boost");
+      }
       return;
     }
 
     if (leftPressed) {
       state.steer = 1;
+      state.lastSoundInput = "turnRight";
+      if (state.mode === "running" && previousSoundInput !== "turnRight") {
+        sound.play("turnRight");
+      }
       return;
     }
 
     if (rightPressed) {
       state.steer = -1;
+      state.lastSoundInput = "turnLeft";
+      if (state.mode === "running" && previousSoundInput !== "turnLeft") {
+        sound.play("turnLeft");
+      }
       return;
     }
 
     state.steer = 0;
+    state.lastSoundInput = "idle";
   }
 
   function setPointerSide(event) {
