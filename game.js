@@ -9,6 +9,8 @@
   const bonusEl = document.getElementById("bonus");
   const shieldEl = document.getElementById("shield");
   const shieldPill = document.getElementById("shieldPill");
+  const soundToggleButton = document.getElementById("soundToggle");
+  const soundIcon = document.getElementById("soundIcon");
   const overlay = document.getElementById("overlay");
   const overlayKicker = document.getElementById("overlayKicker");
   const overlayTitle = document.getElementById("overlayTitle");
@@ -23,6 +25,7 @@
   const STORAGE_KEY = "ski-downhill-best-v1";
   const PLAYER_NAME_KEY = "ski-downhill-player-name-v1";
   const LOCAL_LEADERBOARD_KEY = "ski-downhill-local-leaderboard-v1";
+  const SOUND_MUTED_KEY = "ski-downhill-sound-muted-v1";
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
   const LEADERBOARD_NO_CACHE_HEADERS = {
@@ -85,11 +88,14 @@
     scoreSubmitted: false,
   };
 
+  const sound = createSoundController();
+
   bestEl.textContent = String(state.best);
   speedEl.textContent = "0";
   bonusEl.textContent = "0";
   shieldEl.textContent = "0";
   nicknameInput.value = state.playerName;
+  updateSoundToggle();
 
   function loadSprite(src) {
     const image = new Image();
@@ -146,6 +152,188 @@
       // Some embedded browsers block storage; the current run can still display the best score.
     }
     bestEl.textContent = String(state.best);
+  }
+
+  function readSoundMuted() {
+    try {
+      return window.localStorage.getItem(SOUND_MUTED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function saveSoundMuted(value) {
+    try {
+      window.localStorage.setItem(SOUND_MUTED_KEY, value ? "1" : "0");
+    } catch {
+      // Sound preference is optional.
+    }
+  }
+
+  function createSoundController() {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    let audio = null;
+    let master = null;
+    let muted = readSoundMuted();
+
+    function ensureAudio() {
+      if (!AudioContextClass) return null;
+      if (audio) return audio;
+
+      audio = new AudioContextClass();
+      master = audio.createGain();
+      master.gain.value = muted ? 0 : 0.23;
+      master.connect(audio.destination);
+      return audio;
+    }
+
+    function setMasterGain(value, at = 0) {
+      if (!master || !audio) return;
+      const now = audio.currentTime + at;
+      master.gain.cancelScheduledValues(now);
+      master.gain.setTargetAtTime(value, now, 0.025);
+    }
+
+    function tone(frequency, duration, options = {}) {
+      if (!audio || !master) return;
+      const now = audio.currentTime + (options.delay || 0);
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      const volume = options.volume || 0.18;
+
+      oscillator.type = options.type || "sine";
+      oscillator.frequency.setValueAtTime(frequency, now);
+      if (options.to) {
+        oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, options.to), now + duration);
+      }
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume, now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      oscillator.connect(gain);
+      gain.connect(master);
+      oscillator.start(now);
+      oscillator.stop(now + duration + 0.04);
+    }
+
+    function noise(duration, options = {}) {
+      if (!audio || !master) return;
+      const frameCount = Math.max(1, Math.floor(audio.sampleRate * duration));
+      const buffer = audio.createBuffer(1, frameCount, audio.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < frameCount; i += 1) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / frameCount);
+      }
+
+      const source = audio.createBufferSource();
+      const filter = audio.createBiquadFilter();
+      const gain = audio.createGain();
+      const now = audio.currentTime + (options.delay || 0);
+
+      source.buffer = buffer;
+      filter.type = options.filterType || "highpass";
+      filter.frequency.setValueAtTime(options.frequency || 700, now);
+      gain.gain.setValueAtTime(options.volume || 0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(master);
+      source.start(now);
+      source.stop(now + duration + 0.03);
+    }
+
+    function schedule(name) {
+      if (muted) return;
+
+      if (name === "start") {
+        tone(330, 0.08, { type: "triangle", volume: 0.11 });
+        tone(520, 0.12, { type: "triangle", volume: 0.14, delay: 0.07 });
+        return;
+      }
+
+      if (name === "pickup") {
+        tone(760, 0.07, { type: "sine", volume: 0.12 });
+        tone(1160, 0.1, { type: "sine", volume: 0.1, delay: 0.045 });
+        return;
+      }
+
+      if (name === "shield") {
+        tone(420, 0.1, { type: "triangle", volume: 0.13 });
+        tone(640, 0.14, { type: "triangle", volume: 0.12, delay: 0.08 });
+        return;
+      }
+
+      if (name === "block") {
+        tone(210, 0.12, { type: "sawtooth", volume: 0.11, to: 310 });
+        tone(620, 0.16, { type: "triangle", volume: 0.12, delay: 0.05 });
+        return;
+      }
+
+      if (name === "boost") {
+        noise(0.16, { frequency: 1200, volume: 0.08 });
+        tone(180, 0.18, { type: "triangle", volume: 0.08, to: 260 });
+        return;
+      }
+
+      if (name === "crash") {
+        noise(0.24, { frequency: 240, filterType: "lowpass", volume: 0.2 });
+        tone(140, 0.2, { type: "sawtooth", volume: 0.11, to: 78 });
+        return;
+      }
+
+      if (name === "toggle") {
+        tone(660, 0.07, { type: "sine", volume: 0.08 });
+      }
+    }
+
+    return {
+      isMuted() {
+        return muted;
+      },
+      async unlock() {
+        const instance = ensureAudio();
+        if (!instance || instance.state !== "suspended") return;
+        try {
+          await instance.resume();
+        } catch {
+          // Browsers can reject resume outside direct user gestures.
+        }
+      },
+      play(name) {
+        if (muted) return;
+        const instance = ensureAudio();
+        if (!instance) return;
+
+        if (instance.state === "suspended") {
+          instance.resume()
+            .then(() => schedule(name))
+            .catch(() => {});
+          return;
+        }
+
+        schedule(name);
+      },
+      setMuted(value) {
+        muted = Boolean(value);
+        saveSoundMuted(muted);
+        setMasterGain(muted ? 0 : 0.23);
+        updateSoundToggle();
+      },
+      toggle() {
+        this.setMuted(!muted);
+        if (!muted) this.play("toggle");
+      },
+    };
+  }
+
+  function updateSoundToggle() {
+    const muted = sound.isMuted();
+    soundToggleButton.classList.toggle("is-muted", muted);
+    soundToggleButton.setAttribute("aria-label", muted ? "효과음 꺼짐" : "효과음 켜짐");
+    soundToggleButton.setAttribute("aria-pressed", String(!muted));
+    soundIcon.textContent = muted ? "×" : "♪";
   }
 
   function currentScore() {
@@ -548,6 +736,8 @@
   }
 
   function resetRun() {
+    void sound.unlock();
+    sound.play("start");
     savePlayerName(nicknameInput.value);
     state.mode = "running";
     state.distance = 0;
@@ -575,6 +765,7 @@
   function gameOver() {
     state.mode = "gameover";
     state.deathDistance = currentScore();
+    sound.play("crash");
     saveBest(state.deathDistance);
     setOverlay("gameover");
     if (!state.scoreSubmitted) {
@@ -785,11 +976,13 @@
         if (pickup.type === "flake") {
           state.bonusScore += FLAKE_SCORE;
           addFloater(`+${FLAKE_SCORE}`, "#0284c7");
+          sound.play("pickup");
         }
 
         if (pickup.type === "shield") {
           state.shieldCharges = Math.min(SHIELD_MAX_CHARGES, state.shieldCharges + 1);
           addFloater("방패", "#0f766e");
+          sound.play("shield");
         }
       }
     }
@@ -823,6 +1016,7 @@
             state.invulnerableTime = 0.95;
             item.cleared = true;
             addFloater("방패 보호", "#0f766e");
+            sound.play("block");
             updateHud();
             return;
           }
@@ -1357,6 +1551,7 @@
   function updateInputState() {
     let leftPressed = state.keyLeft;
     let rightPressed = state.keyRight;
+    const wasFastDrop = state.fastDrop;
 
     for (const side of state.pointerSides.values()) {
       if (side === "left") leftPressed = true;
@@ -1364,6 +1559,10 @@
     }
 
     state.fastDrop = leftPressed && rightPressed;
+
+    if (state.mode === "running" && state.fastDrop && !wasFastDrop) {
+      sound.play("boost");
+    }
 
     if (state.fastDrop) {
       state.steer = 0;
@@ -1400,12 +1599,22 @@
       && Boolean(event.target.closest(".overlay, .rotate-warning"));
   }
 
+  function isControlInteraction(event) {
+    return event.target instanceof Element
+      && Boolean(event.target.closest("button, input, label, textarea, select"));
+  }
+
   function handlePointerDown(event) {
+    if (isControlInteraction(event)) {
+      return;
+    }
+
     if (state.mode !== "running" && isOverlayInteraction(event)) {
       return;
     }
 
     event.preventDefault();
+    void sound.unlock();
 
     if (state.mode !== "running") {
       resetRun();
@@ -1422,6 +1631,7 @@
 
   function handleKeyDown(event) {
     if (event.repeat) return;
+    void sound.unlock();
 
     if (event.code === "Space") {
       event.preventDefault();
@@ -1488,7 +1698,15 @@
 
   playerForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    void sound.unlock();
     if (state.mode !== "running") resetRun();
+  });
+
+  soundToggleButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void sound.unlock();
+    sound.toggle();
   });
 
   refreshLeaderboardButton.addEventListener("click", () => {

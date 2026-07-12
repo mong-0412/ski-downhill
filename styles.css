@@ -178,6 +178,28 @@ button {
     0 0 0 2px rgba(20, 184, 166, 0.1);
 }
 
+.sound-toggle {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.sound-toggle span {
+  color: #0f766e;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.sound-toggle.is-muted {
+  opacity: 0.62;
+}
+
+.sound-toggle.is-muted span {
+  color: #64748b;
+}
+
 .overlay,
 .rotate-warning {
   position: fixed;
