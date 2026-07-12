@@ -185,6 +185,9 @@
     let skiLowpass = null;
     let skiPlaying = false;
     let skiSource = null;
+    let turnNoiseBuffer = null;
+    let activeTurnVoice = null;
+    let lastTurnTime = -Infinity;
 
     function ensureAudio() {
       if (!AudioContextClass) return null;
@@ -440,16 +443,139 @@
       source.stop(now + duration + 0.03);
     }
 
-    function schedule(name) {
+    function ensureTurnNoiseBuffer() {
+      if (!audio) return null;
+      if (turnNoiseBuffer) return turnNoiseBuffer;
+
+      const duration = 1.4;
+      const frameCount = Math.max(1, Math.floor(audio.sampleRate * duration));
+      const buffer = audio.createBuffer(1, frameCount, audio.sampleRate);
+      const data = buffer.getChannelData(0);
+      let snowBody = 0;
+      let previous = 0;
+
+      for (let i = 0; i < frameCount; i += 1) {
+        const white = Math.random() * 2 - 1;
+        snowBody = snowBody * 0.965 + white * 0.035;
+        const edgeGrain = white - previous;
+        data[i] = clamp(white * 0.62 + snowBody * 1.35 + edgeGrain * 0.08, -1, 1);
+        previous = white;
+      }
+
+      turnNoiseBuffer = buffer;
+      return turnNoiseBuffer;
+    }
+
+    function fadeActiveTurn(now) {
+      if (!activeTurnVoice) return;
+
+      const voice = activeTurnVoice;
+      activeTurnVoice = null;
+      voice.output.gain.cancelScheduledValues(now);
+      voice.output.gain.setValueAtTime(1, now);
+      voice.output.gain.setTargetAtTime(0.0001, now, 0.025);
+
+      try {
+        voice.source.stop(now + 0.11);
+      } catch {
+        // A completed turn voice no longer needs to be stopped.
+      }
+    }
+
+    function skiTurn(direction, options = {}) {
+      if (!audio || !master) return;
+
+      const buffer = ensureTurnNoiseBuffer();
+      if (!buffer) return;
+
+      const now = audio.currentTime + 0.003;
+      if (now - lastTurnTime < 0.07) return;
+      lastTurnTime = now;
+
+      const speedProgress = clamp((state.speed - BASE_SPEED) / (MAX_SPEED - BASE_SPEED), 0, 1);
+      const duration = 0.225 + speedProgress * 0.035 + Math.random() * 0.015;
+      const reversalBoost = options.reversal ? 1.08 : 1;
+      const bodyPeak = (0.061 + speedProgress * 0.012) * reversalBoost;
+      const source = audio.createBufferSource();
+      const snowHighpass = audio.createBiquadFilter();
+      const snowLowpass = audio.createBiquadFilter();
+      const snowGain = audio.createGain();
+      const edgeBandpass = audio.createBiquadFilter();
+      const edgeGain = audio.createGain();
+      const panner = audio.createStereoPanner ? audio.createStereoPanner() : null;
+      const output = audio.createGain();
+      const offsetLimit = Math.max(0.01, buffer.duration - duration * 1.08);
+      const offset = Math.random() * offsetLimit;
+
+      fadeActiveTurn(now);
+
+      source.buffer = buffer;
+      source.playbackRate.value = 0.94 + Math.random() * 0.1;
+
+      snowHighpass.type = "highpass";
+      snowHighpass.frequency.value = 190;
+      snowHighpass.Q.value = 0.45;
+
+      snowLowpass.type = "lowpass";
+      snowLowpass.frequency.setValueAtTime(1850, now);
+      snowLowpass.frequency.exponentialRampToValueAtTime(4400 + speedProgress * 500, now + 0.055);
+      snowLowpass.frequency.exponentialRampToValueAtTime(1650, now + duration);
+      snowLowpass.Q.value = 0.45;
+
+      snowGain.gain.setValueAtTime(0.0001, now);
+      snowGain.gain.linearRampToValueAtTime(bodyPeak * 0.55, now + 0.018);
+      snowGain.gain.linearRampToValueAtTime(bodyPeak, now + 0.052);
+      snowGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      edgeBandpass.type = "bandpass";
+      edgeBandpass.frequency.setValueAtTime(2400, now);
+      edgeBandpass.frequency.exponentialRampToValueAtTime(4900, now + 0.06);
+      edgeBandpass.frequency.exponentialRampToValueAtTime(2100, now + duration);
+      edgeBandpass.Q.value = 0.62;
+
+      edgeGain.gain.setValueAtTime(0.0001, now);
+      edgeGain.gain.linearRampToValueAtTime(0.021 + speedProgress * 0.006, now + 0.05);
+      edgeGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.86);
+
+      output.gain.value = 1;
+      source.connect(snowHighpass);
+      snowHighpass.connect(snowLowpass);
+      snowLowpass.connect(snowGain);
+      source.connect(edgeBandpass);
+      edgeBandpass.connect(edgeGain);
+
+      if (panner) {
+        panner.pan.setValueAtTime(0, now);
+        panner.pan.linearRampToValueAtTime(direction * 0.18, now + duration * 0.4);
+        snowGain.connect(panner);
+        edgeGain.connect(panner);
+        panner.connect(output);
+      } else {
+        snowGain.connect(output);
+        edgeGain.connect(output);
+      }
+
+      output.connect(master);
+      activeTurnVoice = { source, output };
+      source.onended = () => {
+        if (activeTurnVoice && activeTurnVoice.source === source) {
+          activeTurnVoice = null;
+        }
+      };
+      source.start(now, offset);
+      source.stop(now + duration + 0.03);
+    }
+
+    function schedule(name, options = {}) {
       if (muted) return;
 
       if (name === "turnLeft") {
-        whoosh(0.12, { from: 900, to: 2900, pan: -0.28, volume: 0.07 });
+        skiTurn(-1, options);
         return;
       }
 
       if (name === "turnRight") {
-        whoosh(0.12, { from: 900, to: 2900, pan: 0.28, volume: 0.07 });
+        skiTurn(1, options);
         return;
       }
 
@@ -500,19 +626,19 @@
           // Browsers can reject resume outside direct user gestures.
         }
       },
-      play(name) {
+      play(name, options = {}) {
         if (muted) return;
         const instance = ensureAudio();
         if (!instance) return;
 
         if (instance.state === "suspended") {
           instance.resume()
-            .then(() => schedule(name))
+            .then(() => schedule(name, options))
             .catch(() => {});
           return;
         }
 
-        schedule(name);
+        schedule(name, options);
       },
       setMuted(value) {
         muted = Boolean(value);
@@ -1807,7 +1933,7 @@
       state.steer = 1;
       state.lastSoundInput = "turnRight";
       if (state.mode === "running" && previousSoundInput !== "turnRight") {
-        sound.play("turnRight");
+        sound.play("turnRight", { reversal: previousSoundInput === "turnLeft" });
       }
       return;
     }
@@ -1816,7 +1942,7 @@
       state.steer = -1;
       state.lastSoundInput = "turnLeft";
       if (state.mode === "running" && previousSoundInput !== "turnLeft") {
-        sound.play("turnLeft");
+        sound.play("turnLeft", { reversal: previousSoundInput === "turnRight" });
       }
       return;
     }
