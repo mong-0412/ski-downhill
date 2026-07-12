@@ -24,7 +24,7 @@
   const PLAYER_NAME_KEY = "ski-downhill-player-name-v1";
   const LOCAL_LEADERBOARD_KEY = "ski-downhill-local-leaderboard-v1";
   const LEADERBOARD_LIMIT = 10;
-  const LEADERBOARD_FETCH_LIMIT = 50;
+  const LEADERBOARD_FETCH_LIMIT = 25;
   const BASE_SPEED = 8.5;
   const MAX_SPEED = 29;
   const FAST_DROP_MULTIPLIER = 1.55;
@@ -181,6 +181,27 @@
         return response.json();
       },
       async submit(entry) {
+        const response = await fetch(`${supabaseUrl}/rest/v1/rpc/submit_leaderboard_score`, {
+          method: "POST",
+          headers: {
+            ...baseHeaders,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            p_nickname: entry.nickname,
+            p_score: entry.score,
+            p_distance: entry.distance,
+            p_bonus: entry.bonus,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Supabase score RPC failed");
+        }
+
+        return response.json();
+      },
+      async insert(entry) {
         const response = await fetch(`${supabaseUrl}/rest/v1/leaderboard`, {
           method: "POST",
           headers: {
@@ -350,8 +371,14 @@
 
     try {
       if (supabaseClient) {
-        await supabaseClient.submit(entry);
-        const entries = await supabaseClient.list(LEADERBOARD_FETCH_LIMIT);
+        let entries;
+        try {
+          entries = await supabaseClient.submit(entry);
+        } catch {
+          await supabaseClient.insert(entry);
+          entries = await supabaseClient.list(LEADERBOARD_FETCH_LIMIT);
+        }
+
         state.leaderboardOnline = true;
         renderLeaderboard(Array.isArray(entries) ? entries : []);
         setLeaderboardStatus("점수가 Supabase 리더보드에 반영되었습니다.");
