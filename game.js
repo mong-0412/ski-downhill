@@ -311,7 +311,7 @@
       }
 
       gain.gain.cancelScheduledValues(instance.currentTime);
-      gain.gain.setTargetAtTime(0.08, instance.currentTime, 0.08);
+      gain.gain.setTargetAtTime(0.045, instance.currentTime, 0.08);
 
       if (skiPlaying) return;
       skiPlaying = true;
@@ -410,31 +410,31 @@
       if (muted) return;
 
       if (name === "pickup") {
-        tone(760, 0.07, { type: "sine", volume: 0.12 });
-        tone(1160, 0.1, { type: "sine", volume: 0.1, delay: 0.045 });
+        tone(760, 0.07, { type: "sine", volume: 0.05 });
+        tone(1160, 0.1, { type: "sine", volume: 0.04, delay: 0.045 });
         return;
       }
 
       if (name === "shield") {
-        tone(420, 0.1, { type: "triangle", volume: 0.13 });
-        tone(640, 0.14, { type: "triangle", volume: 0.12, delay: 0.08 });
+        tone(420, 0.1, { type: "triangle", volume: 0.055 });
+        tone(640, 0.14, { type: "triangle", volume: 0.05, delay: 0.08 });
         return;
       }
 
       if (name === "block") {
-        tone(210, 0.12, { type: "sawtooth", volume: 0.11, to: 310 });
-        tone(620, 0.16, { type: "triangle", volume: 0.12, delay: 0.05 });
+        tone(210, 0.12, { type: "sawtooth", volume: 0.05, to: 310 });
+        tone(620, 0.16, { type: "triangle", volume: 0.045, delay: 0.05 });
         return;
       }
 
       if (name === "crash") {
-        noise(0.24, { frequency: 240, filterType: "lowpass", volume: 0.2 });
-        tone(140, 0.2, { type: "sawtooth", volume: 0.11, to: 78 });
+        noise(0.24, { frequency: 240, filterType: "lowpass", volume: 0.08 });
+        tone(140, 0.2, { type: "sawtooth", volume: 0.05, to: 78 });
         return;
       }
 
       if (name === "toggle") {
-        tone(660, 0.07, { type: "sine", volume: 0.08 });
+        tone(660, 0.07, { type: "sine", volume: 0.035 });
       }
     }
 
