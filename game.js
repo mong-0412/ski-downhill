@@ -39,6 +39,7 @@
   const PLAYER_NAME_KEY = "ski-downhill-player-name-v1";
   const LOCAL_LEADERBOARD_KEY = "ski-downhill-local-leaderboard-v1";
   const SOUND_MUTED_KEY = "ski-downhill-sound-muted-v1";
+  const SOUND_MASTER_GAIN = 0.3;
   const SKI_LOOP_SRC = "./assets/ski-loop.wav";
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
@@ -216,7 +217,9 @@
 
       audio = new AudioContextClass();
       master = audio.createGain();
-      master.gain.value = muted ? 0 : 0.23;
+      // Keep the mix comfortably audible on phone speakers without pushing the
+      // combined boost/crash effects into clipping.
+      master.gain.value = muted ? 0 : SOUND_MASTER_GAIN;
       master.connect(audio.destination);
       return audio;
     }
@@ -668,7 +671,7 @@
       setMuted(value) {
         muted = Boolean(value);
         saveSoundMuted(muted);
-        setMasterGain(muted ? 0 : 0.23);
+        setMasterGain(muted ? 0 : SOUND_MASTER_GAIN);
         if (muted) stopSkiLoop();
         updateSoundToggle();
       },
