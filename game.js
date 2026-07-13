@@ -39,7 +39,7 @@
   const PLAYER_NAME_KEY = "ski-downhill-player-name-v1";
   const LOCAL_LEADERBOARD_KEY = "ski-downhill-local-leaderboard-v1";
   const SOUND_MUTED_KEY = "ski-downhill-sound-muted-v1";
-  const SOUND_MASTER_GAIN = 0.3;
+  const SOUND_MASTER_GAIN = 0.35;
   const SKI_LOOP_SRC = "./assets/ski-loop.wav";
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
