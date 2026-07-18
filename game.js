@@ -17,7 +17,7 @@
   const overlayText = document.getElementById("overlayText");
   const distanceResult = document.getElementById("distanceResult");
   const bonusResult = document.getElementById("bonusResult");
-  const firstPlacePrize = document.getElementById("firstPlacePrize");
+  const prizeNotice = document.getElementById("prizeNotice");
   const playerForm = document.getElementById("playerForm");
   const nicknameInput = document.getElementById("nickname");
   const startButton = document.getElementById("startButton");
@@ -44,6 +44,7 @@
   const LEADERBOARD_LIMIT = 10;
   const LEADERBOARD_FETCH_LIMIT = 25;
   const LEADERBOARD_FULL_LIMIT = 1000;
+  const PRIZE_RANK_LIMIT = 2;
   const SCORE_SUBMIT_TIMEOUT_MS = 8000;
   const LEADERBOARD_NO_CACHE_HEADERS = {
     "Cache-Control": "no-cache, no-store, max-age=0",
@@ -893,13 +894,27 @@
     refreshLeaderboardButton.setAttribute("aria-label", "랭킹 새로고침");
   }
 
-  function hideFirstPlacePrize() {
-    firstPlacePrize.hidden = true;
+  function hidePrizeNotice() {
+    prizeNotice.hidden = true;
   }
 
-  function showFirstPlacePrize() {
+  function showPrizeNotice() {
     if (state.mode !== "gameover") return;
-    firstPlacePrize.hidden = false;
+    prizeNotice.hidden = false;
+  }
+
+  function isPrizeWinningEntry(entries, submittedEntry) {
+    const rankedEntries = sortLeaderboard(
+      Array.isArray(entries) ? entries : [],
+      LEADERBOARD_FULL_LIMIT,
+    );
+    const rankIndex = rankedEntries.findIndex(
+      (entry) => entry.nickname === submittedEntry.nickname,
+    );
+
+    return rankIndex >= 0
+      && rankIndex < PRIZE_RANK_LIMIT
+      && rankedEntries[rankIndex].score === submittedEntry.score;
   }
 
   function createLeaderboardItem(entry, index) {
@@ -1144,9 +1159,9 @@
       if (supabaseClient) {
         const submission = await supabaseClient.submit(entry);
 
-        if (submission.isNewFirstPlace === true) showFirstPlacePrize();
         if (!isCurrentLeaderboardRequest(requestId)) return;
         const normalizedEntries = Array.isArray(submission.entries) ? submission.entries : [];
+        if (isPrizeWinningEntry(normalizedEntries, entry)) showPrizeNotice();
         state.leaderboardOnline = true;
         renderLeaderboard(normalizedEntries);
         setLeaderboardStatus("");
@@ -1169,6 +1184,7 @@
       const data = await response.json();
       if (!isCurrentLeaderboardRequest(requestId)) return;
       const normalizedEntries = Array.isArray(data.entries) ? data.entries : [];
+      if (isPrizeWinningEntry(normalizedEntries, entry)) showPrizeNotice();
       state.leaderboardOnline = true;
       renderLeaderboard(normalizedEntries);
       setLeaderboardStatus("");
@@ -1176,6 +1192,7 @@
     } catch {
       const localEntries = saveLocalLeaderboardEntry(entry);
       if (!isCurrentLeaderboardRequest(requestId)) return;
+      if (isPrizeWinningEntry(localEntries, entry)) showPrizeNotice();
       state.leaderboardOnline = false;
       renderLeaderboard(localEntries);
       setLeaderboardStatus("오프라인 기록으로 저장했어요.");
@@ -1267,7 +1284,7 @@
     overlay.dataset.mode = mode;
 
     if (mode === "running") {
-      hideFirstPlacePrize();
+      hidePrizeNotice();
       overlay.classList.add("is-hidden");
       overlay.classList.remove("is-splash");
       return;
@@ -1276,7 +1293,7 @@
     overlay.classList.remove("is-hidden");
 
     if (mode === "ready") {
-      hideFirstPlacePrize();
+      hidePrizeNotice();
       overlay.classList.add("is-splash");
       overlayKicker.textContent = "HOW TO RIDE";
       overlayTitle.textContent = "씽씽 스키";
@@ -1335,7 +1352,7 @@
     sound.stopSkiLoop();
     sound.play("crash");
     saveBest(state.deathDistance);
-    hideFirstPlacePrize();
+    hidePrizeNotice();
     setOverlay("gameover");
     if (!state.scoreSubmitted) {
       state.scoreSubmitted = true;

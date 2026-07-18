@@ -1,4 +1,4 @@
-const CACHE_NAME = "ski-downhill-v35";
+const CACHE_NAME = "ski-downhill-v36";
 const ASSETS = [
   "./",
   "./index.html",
